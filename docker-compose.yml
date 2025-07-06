@@ -1,0 +1,14 @@
+services:
+  # Frontend Service (React + Nginx)
+  frontend:
+    image: 235639741719.dkr.ecr.us-east-2.amazonaws.com/my-chat-app/frontend:latest
+    ports:
+      - "80:80" # Standard HTTP port for the final deployment
+
+  # Backend Service (Flask + Gunicorn)
+  backend:
+    image: 235639741719.dkr.ecr.us-east-2.amazonaws.com/my-chat-app/backend:latest
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./backend/.env
