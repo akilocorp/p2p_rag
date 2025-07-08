@@ -1,5 +1,5 @@
 from flask import Flask, Blueprint, request, jsonify, current_app
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request
 import urllib.parse
 import logging
 import os
@@ -19,6 +19,45 @@ config_bp = Blueprint('config_routes', __name__)
 def allowed_file(filename):
     """Checks if the uploaded file has an allowed extension."""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@config_bp.route('/config/<string:config_id>', methods=['PUT'])
+@jwt_required()
+def update_config(config_id):
+    """
+    Updates a configuration, such as its public status.
+    Only the owner of the config can update it.
+    """
+    try:
+        user_id = get_jwt_identity()
+        data = request.get_json()
+        is_public = data.get('is_public')
+
+        if is_public is None or not isinstance(is_public, bool):
+            return jsonify({"error": "Missing or invalid 'is_public' field"}), 400
+
+        # Find the config ensuring it belongs to the authenticated user
+        config_to_update = Config.get_collection().find_one({
+            "_id": ObjectId(config_id),
+            "user_id": user_id
+        })
+
+        if not config_to_update:
+            return jsonify({"message": "Configuration not found or access denied"}), 404
+
+        # Update the document in the database
+        Config.get_collection().update_one(
+            {"_id": ObjectId(config_id)},
+            {"$set": {"is_public": is_public}}
+        )
+
+        return jsonify({"message": "Configuration updated successfully"}), 200
+
+    except Exception as e:
+        current_app.logger.error(f"Error updating config {config_id}: {e}", exc_info=True)
+        return jsonify({"error": "An internal server error occurred"}), 500
+
+
+
 @config_bp.route('/config_list', methods=['GET'])
 @jwt_required()
 def getconfigs():
@@ -51,39 +90,39 @@ def getconfigs():
             current_app.logger.error(f"Error fetching configurations for user {user_id}: {e}", exc_info=True)
         return jsonify({"message": "An internal server error occurred"}), 500
 @config_bp.route('/config/<string:config_id>', methods=['GET'])
-@jwt_required()
-
 def get_single_config(config_id):
     logger.info(f'{config_id}',exc_info=True)
     user_id=''
     """
-    Fetches a single configuration by its ID, ensuring it belongs to the authenticated user.
+    Fetches a single configuration.
+    If the config is private, a valid JWT for the owner is required.
+    If public, it can be accessed without a JWT.
     """
     try:
-        # 1. Get the user ID from the JWT
-        user_id = get_jwt_identity()
-        if  user_id=='':
-            return jsonify({"error": "User not authenticated"}), 401
-
+       
         # 2. Validate the provided config_id to ensure it's a valid MongoDB ObjectId
         if not ObjectId.is_valid(config_id):
             return jsonify({"message": "Invalid configuration ID format"}), 400
 
         # 3. Query the database for a document that matches BOTH the config_id and the user_id
         # This is a critical security check to prevent users from accessing others' configs.
-        config_document = Config.find_by_id_user(config_id, user_id=user_id)
+        config_document = Config.get_collection().find_one({"_id":ObjectId(config_id)})
+        logger.info(f"config {config_document}",exc_info=True)
+        if config_document is None:
+            return jsonify({"message": "Configuration not found or access denied"}), 404
+        if config_document["is_public"]==False:
+            verify_jwt_in_request() # This will raise an error if no valid JWT is present
+            user_id = get_jwt_identity()
+            if config_document["user_id"] != user_id:
+                return jsonify({"message": "Access denied"}), 403
 
         # 4. Check if a configuration was found
-        if not config_document:
-            return jsonify({"message": "Configuration not found or access denied"}), 404
+        
 
         # 5. Serialize the document for the JSON response
         # Convert the ObjectId to a string so it's JSON serializable
         config_document["_id"] = str(config_document["_id"])
-        
-        # Return the single configuration object
         return jsonify({"config": config_document}), 200
-
     except Exception as e:
         current_app.logger.error(f"Error fetching config {config_id} for user {user_id}: {e}", exc_info=True)
         return jsonify({"message": "An internal server error occurred"}), 500
@@ -115,6 +154,8 @@ def configure_model():
         
         uploaded_files = request.files.getlist('files')
         llm_type = config_data.get('model_name')
+        is_public = config_data.get('is_public')
+
         bot_name = config_data.get('bot_name', 'Assistant') # Default bot name
         temperature_str = config_data.get('temperature')
         collection_name = config_data.get('collection_name')
@@ -183,6 +224,7 @@ Answer:"""
             "model_name": llm_type,
             "prompt_template": final_prompt_template, # Save the dynamically created template
             "temperature": temperature,
+            "is_public":is_public
         }
         
         result = mongo_collection.get_collection().insert_one(config_document)

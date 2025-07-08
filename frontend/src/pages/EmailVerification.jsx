@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom'; // Assuming you use React Router
-import axios from 'axios';
+import apiClient from '../api/apiClient';
 
 const EmailVerificationPage = () => {
   const [message, setMessage] = useState('Verifying your email, please wait...');
@@ -22,7 +22,7 @@ const EmailVerificationPage = () => {
 
       try {
         // API call to your backend to verify the token
-        const response = await axios.post('http://localhost:5000/api/auth/verify-email', { token });
+        const response = await apiClient.post('/auth/verify-email', { token });
 
         setMessage(response.data.message || 'Email verified successfully! You can now log in.');
         setIsError(false);

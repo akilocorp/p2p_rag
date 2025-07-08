@@ -39,11 +39,12 @@ function App() {
         
 
         {/* Protected Routes */}
+        <Route path="/chat/:configId/:chatId?" element={<ChatPage />} />
+
         <Route element={<ProtectedRoute />}> {/* Use ProtectedRoute as a wrapper */}
         <Route path="/config_list" element={<ConfigList />} />
 
           <Route path="/config" element={<ConfigPage />} />
-          <Route path="/chat/:configId/:chatId?" element={<ChatPage />} />
 
         </Route>
 

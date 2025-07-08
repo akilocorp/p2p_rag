@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
 import LoadingSpinner from '../components/LoadingSpineer'; // ---> 1. Import the spinner
+import apiClient from '../api/apiClient';
 
 const LoginPage = () => {
   const [username, setUsername] = useState('');
@@ -31,7 +31,7 @@ const LoginPage = () => {
 
     setIsLoading(true); // ---> 3. Set loading to true
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/login', {
+      const response = await apiClient.post('/auth/login', {
         username,
         password,
       });

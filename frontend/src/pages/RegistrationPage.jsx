@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import LoadingSpinner from '../components/LoadingSpineer';
-import { useNavigate, Link, Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
+import apiClient from '../api/apiClient';
 
 const RegistrationPage = ({ navigateTo }) => {
   const [email, setEmail] = useState('');
@@ -40,7 +40,7 @@ const RegistrationPage = ({ navigateTo }) => {
     setIsLoading(true);
     try {
       // Assumes the backend will send the verification email
-      await axios.post('http://localhost:5000/api/auth/register', {
+      await apiClient.post('/auth/register', {
         email,
         username,
         password,

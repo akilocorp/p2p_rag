@@ -35,7 +35,7 @@ class Config:
         return config_collection.insert_one(obj)
 
     @staticmethod
-    def find_by_id_user(id, user_id):
+    def find_by_id(id):
         """Finds a user by their email address."""
         
         return Config.get_collection().find_one({"_id":ObjectId(id)})

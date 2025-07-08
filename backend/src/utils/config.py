@@ -59,6 +59,4 @@ def load_secrets():
 
     except Exception as e:
         logger.critical(f"FATAL ERROR during accessing st.secrets: {e}", exc_info=True)
-        st.error(f"Fatal error accessing secrets: {e}")
-        st.stop()
         return {} # Return an empty dict if the app stops

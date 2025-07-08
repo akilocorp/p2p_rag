@@ -16,4 +16,4 @@ EXPOSE 5000
 
 # --- NEW COMMAND ---
 # Run the app directly using the python interpreter
-CMD ["python", "app.py"]
+CMD ["python", "app.py"] 

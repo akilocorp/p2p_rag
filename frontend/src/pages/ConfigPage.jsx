@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import LoadingSpinner from '../components/LoadingSpineer';
+import apiClient from '../api/apiClient';
 
 // The FileUpload component remains the same
 const FileUpload = ({ onFileChange, initialFiles }) => {
@@ -84,14 +84,17 @@ const ConfigPage = () => {
     prompt_template: '',
     temperature: 0.7,
     rag_files: [],
-    collection_name: ''
+    collection_name: '',
+    is_public: false,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({}); // ---> 1. Add error state
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setConfig(prev => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    // Handle checkbox type for the public toggle
+    const val = type === 'checkbox' ? checked : value;
+    setConfig(prev => ({ ...prev, [name]: val }));
   };
 
   const handleFileChange = (files) => {
@@ -127,7 +130,7 @@ const ConfigPage = () => {
         return;
       }
       
-      const response = await axios.post('http://localhost:5000/api/config', formData, { headers: { 'Authorization': `Bearer ${token}` } });
+      const response = await apiClient.post('/config', formData, { headers: { 'Authorization': `Bearer ${token}` } });
       
       console.log('Configuration saved:', response.data);
       // On success, we navigate away, so an alert isn't strictly necessary
@@ -166,7 +169,26 @@ const ConfigPage = () => {
               <option value="qwen-turbo">Qwen Turbo</option>
             </select>
           </div>
-
+          <div className="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
+            <span className="font-medium text-gray-300">Public Access</span>
+            <label htmlFor="is_public" className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                id="is_public"
+                name="is_public"
+                className="sr-only peer"
+                checked={config.is_public}
+                onChange={handleChange}
+              />
+              <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-focus:ring-4 peer-focus:ring-indigo-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+              <span className="ml-3 text-sm font-medium text-gray-300">
+                {config.is_public ? "Enabled" : "Disabled"}
+              </span>
+            </label>
+          </div>
+          <p className="text-xs text-gray-500 -mt-4 ml-1">
+            When enabled, anyone with the link can chat with this bot without logging in.
+          </p>
           <div>
             <label className="block text-sm font-medium text-gray-300">Prompt Method</label>
             <div className="mt-2 flex space-x-4">
