@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import apiClient from '../api/apiClient';
 import { FaPlus, FaRobot, FaCog, FaSpinner,FaUser } from 'react-icons/fa';
 
-const ConfigItem = ({ config, onSelect }) => {
+const ConfigItem = ({ config, onSelect, onEdit }) => {
   const [isHovered, setIsHovered] = useState(false);
 
   return (
@@ -23,24 +23,33 @@ const ConfigItem = ({ config, onSelect }) => {
           <h3 className="text-lg font-bold text-white truncate">{config.bot_name}</h3>
           <p className="text-sm text-gray-400 mt-1">Model: {config.model_name}</p>
           <div className="mt-3 flex flex-wrap gap-2">
+            {isHovered && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-xl pointer-events-none">
+                <div className="px-3 py-1 text-xs font-medium bg-indigo-500/90 text-white rounded-full">
+                  Click to chat
+                </div>
+              </div>
+            )}
             <span className="px-2 py-1 text-xs rounded-full bg-gray-700/50 text-gray-300">
               {config.temperature ? `Temp: ${config.temperature}` : 'Default temp'}
             </span>
-            {config.max_tokens && (
-              <span className="px-2 py-1 text-xs rounded-full bg-gray-700/50 text-gray-300">
-                Max tokens: {config.max_tokens}
-              </span>
-            )}
+           
+           
           </div>
         </div>
       </div>
-      {isHovered && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-xl pointer-events-none">
-          <div className="px-3 py-1 text-xs font-medium bg-indigo-500/90 text-white rounded-full">
-            Click to chat
-          </div>
-        </div>
-      )}
+      <div className="mt-3 flex justify-end">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit(config);
+          }}
+          className="px-2 py-1 text-xs font-medium bg-gray-700/50 text-gray-300 hover:text-gray-300 transition-colors flex items-center space-x-1"
+        >
+          <FaCog className="text-xs" />
+          <span>Edit</span>
+        </button>
+      </div>
     </div>
   );
 };
@@ -50,6 +59,7 @@ const ConfigListPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const fetchConfigs = async () => {
@@ -66,10 +76,24 @@ const ConfigListPage = () => {
     };
 
     fetchConfigs();
-  }, []);
+
+    // Refresh when returning from edit
+    if (location.state?.refresh) {
+      fetchConfigs();
+    }
+
+    // Cleanup
+    return () => {
+      // Cleanup any subscriptions or timers if needed
+    };
+  }, [location]);
 
   const handleSelectConfig = (configId) => {
     navigate(`/chat/${configId}`);
+  };
+
+  const handleEditConfig = (config) => {
+    navigate('/edit-config', { state: { config } });
   };
 
   const handleCreateNew = () => {
@@ -127,6 +151,7 @@ const ConfigListPage = () => {
                     key={config.config_id} 
                     config={config} 
                     onSelect={handleSelectConfig} 
+                    onEdit={handleEditConfig} 
                   />
                 ))
               ) : (

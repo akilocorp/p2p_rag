@@ -12,7 +12,7 @@ import ChatPage from './pages/ChatPage';
 import ConfigList from './pages/ConfigList';
 import EmailVerificationPage from './pages/EmailVerification';
 import SideBar from './components/SideBar'; // Import the SideBar component
-
+import EditConfigPage from './pages/EditConfigPage';
 
 // Import the ProtectedRoute component
 import ProtectedRoute from './components/ProtectedRoute'; 
@@ -44,6 +44,7 @@ function App() {
             } />
             {/* Protected routes */}
             <Route path="/config" element={<ConfigPage />} />
+            <Route path="/edit-config" element={<EditConfigPage />} />
             <Route path="/config_list" element={<ConfigList />} />
             <Route path="/chat/:configId/:chatId?" element={<ChatPage />} />
           </Route>

@@ -108,7 +108,6 @@ def create_app():
     def refresh():
     # Get the identity from the refresh token
         current_user_identity = get_jwt_identity()
-    
         # Create a new access token
         new_access_token = create_access_token(identity=current_user_identity)
         
