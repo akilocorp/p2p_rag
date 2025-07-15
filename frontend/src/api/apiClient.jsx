@@ -4,7 +4,7 @@ import axios from 'axios';
 
 // Create a new axios instance with a base URL
 const apiClient = axios.create({
-  baseURL: 'http://backend:5000/api', // Your Flask backend's base URL
+  baseURL: 'http://localhost:5000/api', // Use localhost for browser access
 });
 
 // --- Request Interceptor ---
