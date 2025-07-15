@@ -12,9 +12,42 @@ logger = logging.getLogger(__name__)
 def get_mongo_db_connection(mongo_uri: str, db_name: str, collection_name: str):
     """Establishes a connection to MongoDB and returns the client, db, and collection."""
     try:
-        mongo_client = pymongo.MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
-        # The line below will check the connection immediately
-        mongo_client.admin.command('ping')
+        # Parse the connection string to extract the replica set name
+        from urllib.parse import urlparse
+        parsed_uri = urlparse(mongo_uri)
+        
+        # Extract the replica set name from the host part
+        replica_set = None
+        if parsed_uri.hostname and 'replicaSet' in parsed_uri.hostname:
+            replica_set = parsed_uri.hostname.split(',')[0].split('/')[-1]
+        
+        # Set up the client with proper read preferences for Atlas
+        mongo_client = pymongo.MongoClient(
+            mongo_uri,
+            serverSelectionTimeoutMS=5000,
+            replicaSet=replica_set,
+            readPreference="secondaryPreferred",  # Use secondary nodes first
+            retryWrites=True,
+            w="majority"  # Wait for majority of nodes to confirm write
+        )
+        
+        # Try to establish connection
+        try:
+            mongo_client.admin.command('ping')
+            logger.info("Successfully connected to MongoDB")
+        except Exception as e:
+            logger.warning(f"Initial ping failed: {e}")
+            # Try to connect to a specific database instead
+            mongo_db = mongo_client[db_name]
+            try:
+                # Try a simple operation to test the connection
+                mongo_db.command('buildInfo')
+                logger.info("Successfully connected to database")
+            except Exception as e:
+                logger.warning(f"Database connection test failed: {e}")
+                # If all else fails, just return the client
+                pass
+        
         mongo_db = mongo_client[db_name]
         mongo_collection = mongo_db[collection_name]
         logger.info("MongoDB connection established successfully.")

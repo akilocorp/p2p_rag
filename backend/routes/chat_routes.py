@@ -16,6 +16,7 @@ from bson import ObjectId
 from langchain_community.chat_models import ChatTongyi
 from langchain_deepseek import ChatDeepSeek
 from langchain_core.messages import HumanMessage, AIMessage
+from src.utils.vector_store_utils import initialize_vector_store
 
 # --- Setup ---
 logger = logging.getLogger(__name__)
@@ -123,10 +124,10 @@ def chat(config_id, chat_id):
                 return jsonify({"message": "Access denied to this chatbot"}), 403
         
         db = current_app.config['MONGO_DB']
-        vector_store = MongoDBAtlasVectorSearch(
-            collection=db['vector_collection'],
-            embedding=current_app.config['EMBEDDINGS'],
-            index_name="vector",
+        vector_store = initialize_vector_store(
+            db=db,
+            config_id=config_id,
+            embeddings=current_app.config['EMBEDDINGS']
         )
         
         retriever = vector_store.as_retriever(
