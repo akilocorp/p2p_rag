@@ -224,34 +224,47 @@ const ChatPage = () => {
       <div className={`flex-1 flex flex-col w-full transition-all duration-300 ${
         isSidebarCollapsed ? 'md:ml-20' : 'md:ml-72'
       }`}>
-        <header className="p-4 bg-gray-800/50 backdrop-blur-lg border-b border-gray-700/50">
+        <header className="p-4 bg-gray-900 backdrop-blur-lg border-b border-gray-900">
           <div className="container mx-auto flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <button className="md:hidden text-gray-400" onClick={() => setShowSidebar(true)}>
+              <button className="md:hidden  p-2 rounded-full bg-gray-800/50 hover:bg-gray-700/50 text-gray-400 hover:text-gray-300 transition-colors" onClick={() => setShowSidebar(true)}>
                 <FiChevronRight className="text-xl" />
               </button>
               
             </div>
-            <div className="text-center">
-              <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-500">
+            {/* <div className="text-center">
+              <h1 className="text-xl font-bold text-indigo-400">
                 {config.bot_name}
               </h1>
               <p className="text-xs text-gray-400">{config.model_name}</p>
-            </div>
-            <div className="w-8" />
+            </div> */}
+            
           </div>
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
           <div className="container mx-auto max-w-4xl space-y-6">
             {messages.length === 0 && !isLoading && (
-              <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                <RiRobot2Line className="text-5xl text-indigo-400 mb-4" />
-                <h2 className="text-2xl font-bold text-white mb-2">How can I help you today?</h2>
-                <p className="text-gray-400 max-w-md">
-                  Ask me anything about {config.bot_name}'s knowledge base or start a conversation.
+              <div className="flex flex-col items-center justify-center h-full text-center px-4 py-16 sm:py-20">
+              <div className="mb-6 flex flex-col items-center">
+                <RiRobot2Line className="text-6xl text-indigo-500 mb-3 animate-bounce" style={{ animationDuration: '2s' }} />
+                <h2 className='text-3xl font-bold bg-gradient-to-r from-indigo-400 to-purple-500 bg-clip-text text-transparent'>
+                  Hey! I'm {config.bot_name}
+                </h2>
+                <p className="text-xs text-gray-400 mt-1 bg-gray-800 px-2 py-1 rounded-full">
+                  {config.model_name}
                 </p>
               </div>
+              
+              <h2 className="text-2xl font-bold bg-gray-400 bg-clip-text text-transparent ">
+                How can I help you today?
+              </h2>
+              <p className="text-xs text-gray-500 mt-2 text-center">
+                Ask me anything about {config.bot_name}'s knowledge base or start a conversation.
+              </p>
+              
+             
+            </div>
             )}
             {messages.map((msg, index) => (
               <ChatMessage key={index} message={msg} />
@@ -263,7 +276,7 @@ const ChatPage = () => {
           </div>
         </main>
 
-        <footer className="p-4 bg-gray-800/50 backdrop-blur-lg border-t border-gray-700/50">
+        <footer className="p-4 bg-gray-900 backdrop-blur-lg border-t border-gray-700/50">
           <div className="container mx-auto max-w-4xl">
             <div className="flex items-center gap-2">
               <input
