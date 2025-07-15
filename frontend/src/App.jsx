@@ -24,18 +24,17 @@ function App() {
   return (
     <Router>
       <div className="min-h-screen bg-gray-900 text-white">
-        {/* Public Routes */}
         <Routes>
+          {/* Public Routes - No authentication required */}
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/verify-email" element={<EmailVerificationPage />} />
 
-          {/* Protected Routes */}
+          {/* Protected Routes - Requires authentication */}
           <Route element={<ProtectedRoute />}>
-            {/* Root route */}
+            {/* Root route - Config List */}
             <Route path="/" element={
               <div className="flex flex-1">
-                <SideBar />
                 <div className="flex-1">
                   <Routes>
                     <Route index element={<ConfigList />} />
@@ -43,7 +42,7 @@ function App() {
                 </div>
               </div>
             } />
-            {/* Direct access routes */}
+            {/* Protected routes */}
             <Route path="/config" element={<ConfigPage />} />
             <Route path="/config_list" element={<ConfigList />} />
             <Route path="/chat/:configId/:chatId?" element={<ChatPage />} />

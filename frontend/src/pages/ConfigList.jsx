@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../api/apiClient';
-import { FaPlus, FaRobot, FaCog, FaSpinner } from 'react-icons/fa';
+import { FaPlus, FaRobot, FaCog, FaSpinner,FaUser } from 'react-icons/fa';
 
 const ConfigItem = ({ config, onSelect }) => {
   const [isHovered, setIsHovered] = useState(false);

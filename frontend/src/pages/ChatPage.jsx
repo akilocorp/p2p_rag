@@ -5,6 +5,7 @@ import { marked } from 'marked';
 import { FiSend, FiArrowLeft, FiLoader, FiAlertTriangle } from 'react-icons/fi';
 import { RiRobot2Line, RiUser3Line } from 'react-icons/ri';
 import { FaPlus, FaRobot, FaCog, FaSpinner } from 'react-icons/fa';
+import ChatSidebar from '../components/SideBar';
 
 const ChatMessage = ({ message }) => {
     const { sender, text, isTyping } = message;
@@ -178,7 +179,10 @@ const ChatPage = () => {
 
     return (
         <div className="flex flex-col h-screen bg-gradient-to-b from-gray-900 to-gray-800">
-            <header className="p-4 bg-gray-800/50 backdrop-blur-lg border-b border-gray-700/50">
+            <div className="flex-1 flex">
+                <ChatSidebar configId={configId} />
+                <div className="flex-1 flex flex-col">
+                    <header className="p-4 bg-gray-800/50 backdrop-blur-lg border-b border-gray-700/50">
                 <div className="container mx-auto flex items-center justify-between">
                     <button 
                         onClick={() => navigate('/config_list')} 
@@ -221,7 +225,7 @@ const ChatPage = () => {
                 </div>
             </main>
 
-            <footer className="p-4 bg-gray-800/50 backdrop-blur-lg border-t border-gray-700/50">
+            <footer className="p-4 bg-gray-800/50 backdrop-blur-lg border-t border-gray-700/50 ml-64">
                 <div className="container mx-auto max-w-4xl">
                     <div className="flex items-center gap-2">
                         <input
@@ -251,6 +255,8 @@ const ChatPage = () => {
                     </p>
                 </div>
             </footer>
+                </div>
+            </div>
         </div>
     );
 };

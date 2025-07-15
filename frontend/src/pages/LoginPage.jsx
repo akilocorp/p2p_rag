@@ -39,7 +39,10 @@ const LoginPage = () => {
       if (access_token) {
         localStorage.setItem('jwtToken', access_token);
         if (rememberMe) localStorage.setItem('refreshToken', refresh_token);
-        navigate('/config_list');
+        // Clear any previous errors
+        setErrors({});
+        // Redirect to config_list
+        navigate('/config_list', { replace: true });
       } else {
         setErrors({ form: 'Login failed: No authentication token received.' });
       }

@@ -139,6 +139,28 @@ def verify_email():
         current_app.logger.error(f"Error in /verify-email: {e}")
         return jsonify({"message": "An internal server error occurred"}), 500
 
+@auth_bp.route('/me', methods=['GET'])
+@jwt_required()
+def get_user_info():
+    """
+    Get the current user's information.
+    Requires a valid JWT token.
+    """
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.find_by_id(current_user_id)
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        
+        # Return user info without sensitive data
+        return jsonify({
+            "username": user['username'],
+            "email": user['email']
+        })
+    except Exception as e:
+        current_app.logger.error(f"Error in /me route: {e}")
+        return jsonify({"error": "An internal server error occurred"}), 500
+
 @auth_bp.route('/login', methods=['POST'])
 def login():
     """
