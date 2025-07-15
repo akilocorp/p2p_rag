@@ -256,7 +256,7 @@ const ChatPage = () => {
                 </p>
               </div>
               
-              <h2 className="text-2xl font-bold bg-gray-400 bg-clip-text text-transparent ">
+              <h2 className="text-2xl font-bold bg-gray-500 bg-clip-text text-transparent ">
                 How can I help you today?
               </h2>
               <p className="text-xs text-gray-500 mt-2 text-center">
