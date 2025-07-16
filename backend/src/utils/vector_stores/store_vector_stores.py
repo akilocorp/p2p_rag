@@ -113,4 +113,3 @@ def process_files_and_create_vector_store(temp_file_paths, user_id, collection_n
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
                 current_app.logger.info(f"Cleaned up temporary upload file: {temp_file_path}")
-

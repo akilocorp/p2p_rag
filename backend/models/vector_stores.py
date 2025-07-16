@@ -46,4 +46,3 @@ class VectorStores:
         return VectorStores.get_collection().find({"user_id": user_id})
 
    
-

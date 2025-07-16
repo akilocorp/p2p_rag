@@ -88,7 +88,7 @@ const ChatPage = () => {
           const response = await apiClient.get(`/history/${chatId}`);
           const formattedMessages = response.data.history.map(item => ({
             sender: item.type === 'human' ? 'user' : 'ai',
-            text: item.data.content
+            text: item.data ? item.data.content : ''
           }));
           setMessages(formattedMessages);
         } catch (error) {
@@ -105,7 +105,7 @@ const ChatPage = () => {
   useEffect(() => {
     const fetchSessions = async () => {
       try {
-        const response = await apiClient.get(`/sessions/${configId}`);
+        const response = await apiClient.get(`/chat/list/${configId}`);
         setSessions(response.data.sessions);
       } catch (error) {
         console.error("Failed to fetch sessions:", error);
@@ -153,7 +153,7 @@ const ChatPage = () => {
       }]);
 
       // Refresh sessions after new message
-      const sessionsResponse = await apiClient.get(`/sessions/${configId}`);
+      const sessionsResponse = await apiClient.get(`/chat/list/${configId}`);
       setSessions(sessionsResponse.data.sessions);
     } catch (error) {
       console.error("Chat error:", error);
