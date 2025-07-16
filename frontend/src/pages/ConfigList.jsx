@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import apiClient from '../api/apiClient';
-import { FaPlus, FaRobot, FaCog, FaSpinner,FaUser } from 'react-icons/fa';
+import { FaPlus, FaRobot, FaCog, FaSpinner, FaUser, FaSignOutAlt, FaChevronDown } from 'react-icons/fa';
 
 const ConfigItem = ({ config, onSelect, onEdit }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -60,6 +60,7 @@ const ConfigListPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [username, setUsername] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -101,6 +102,20 @@ const ConfigListPage = () => {
     navigate('/config');
   };
 
+  const handleLogout = async () => {
+    try {
+      // Assuming your backend has a /logout endpoint
+      await apiClient.post('/logout');
+      // Clear the token from local storage
+      localStorage.removeItem('jwtToken');
+      // Redirect to login page, replacing the current history entry
+      navigate('/login', { replace: true });
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Handle logout error, e.g., show a notification
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white">
       <div className="container mx-auto px-4 py-8 sm:px-6 lg:px-8 max-w-7xl">
@@ -114,19 +129,43 @@ const ConfigListPage = () => {
                 Manage and interact with your custom LLM configurations
               </p>
             </div>
-            {username && (
-              <div className="flex items-center space-x-3 bg-gray-800/50 border border-gray-700/50 rounded-full px-4 py-2">
-                <FaUser className="text-indigo-400" />
-                <span className="font-medium text-white">{username}</span>
-              </div>
-            )}
-            <button
-              onClick={handleCreateNew}
-              className="flex items-center space-x-2 px-4 py-3 font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition-all active:scale-[0.98]"
-            >
-              <FaPlus className="text-sm" />
-              <span>New Assistant</span>
-            </button>
+
+            <div className="flex items-center gap-4">
+              <button
+                onClick={handleCreateNew}
+                className="flex items-center space-x-2 px-4 py-3 font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition-all active:scale-[0.98]"
+              >
+                <FaPlus className="text-sm" />
+                <span>New Assistant</span>
+              </button>
+
+              {username && (
+                <div className="relative">
+                  <button 
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    className="flex items-center space-x-3 bg-gray-800/50 border border-gray-700/50 rounded-full px-4 py-2 focus:outline-none   transition-colors hover:border-indigo-600/70"
+                  >
+                    <FaUser className="text-indigo-400" />
+                    <span className="font-medium text-white">{username}</span>
+                    <FaChevronDown className={`transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {isDropdownOpen && (
+                    <div 
+                      className="absolute right-0 mt-2 w-48  border border-gray-700/50 rounded-md shadow-lg z-10 overflow-hidden transition-all duration-300 ease-in-out transform origin-top-right"
+                      style={{ transform: isDropdownOpen ? 'scale(1)' : 'scale(0.95)', opacity: isDropdownOpen ? 1 : 0 }}
+                    >
+                      <button 
+                        onClick={handleLogout}
+                        className="flex items-center w-full px-4 py-3 text-sm text-left bg-gray-800/50 rounded-md text-gray-300  hover:text-white transition-colors"
+                      >
+                        <FaSignOutAlt className="mr-3" />
+                        <span>Logout</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {loading && (
