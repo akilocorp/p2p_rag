@@ -1,6 +1,7 @@
 from flask import current_app
 import pymongo
 from werkzeug.security import generate_password_hash, check_password_hash
+from bson import ObjectId
 
 class User:
     """
@@ -43,6 +44,16 @@ class User:
     def find_by_username(username):
         """Finds a user by their username."""
         return User.get_collection().find_one({"username": username})
+
+    @staticmethod
+    def find_by_id(user_id):
+        """Finds a user by their unique _id."""
+        try:
+            # PyMongo requires that the string ID be converted to an ObjectId
+            return User.get_collection().find_one({"_id": ObjectId(user_id)})
+        except Exception:
+            # This can happen if the user_id is not a valid format
+            return None
 
     @staticmethod
     def check_password(password_hash, password):

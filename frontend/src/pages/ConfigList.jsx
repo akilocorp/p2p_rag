@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+
 import { useNavigate, useLocation } from 'react-router-dom';
 import apiClient from '../api/apiClient';
 import { FaPlus, FaRobot, FaCog, FaSpinner,FaUser } from 'react-icons/fa';
@@ -11,7 +12,7 @@ const ConfigItem = ({ config, onSelect, onEdit }) => {
       className={`relative bg-gray-800/50 backdrop-blur-sm p-6 rounded-xl border border-gray-700/50 shadow-lg transition-all duration-300 ${
         isHovered ? 'border-indigo-500/50 transform -translate-y-1' : 'hover:border-gray-600'
       }`}
-      onClick={() => onSelect(config.config_id)}
+      onClick={() => onSelect(config._id)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -58,35 +59,35 @@ const ConfigListPage = () => {
   const [configs, setConfigs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [username, setUsername] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    const fetchConfigs = async () => {
+    const loadPageData = async () => {
+      setLoading(true);
       try {
-        setLoading(true);
+        // Make a single API call to the optimized endpoint
         const response = await apiClient.get('/config_list');
+        
+        // Set both username and configs from the single response
+        setUsername(response.data.username);
         setConfigs(response.data.configs);
+
       } catch (err) {
-        setError('Failed to load configurations. Please try again later.');
-        console.error('Fetch error:', err);
+        console.error('Failed to load page data:', err);
+        setError('Failed to load your data. Please try logging in again.');
+        if (err.response?.status === 401) {
+          navigate('/login');
+        }
       } finally {
         setLoading(false);
       }
     };
 
-    fetchConfigs();
-
-    // Refresh when returning from edit
-    if (location.state?.refresh) {
-      fetchConfigs();
-    }
-
-    // Cleanup
-    return () => {
-      // Cleanup any subscriptions or timers if needed
-    };
-  }, [location]);
+    loadPageData();
+    // The dependency array ensures this runs on mount and when navigating back (e.g., from edit page)
+  }, [location.key, navigate]); // Using location.key is a reliable way to trigger refetch on navigation
 
   const handleSelectConfig = (configId) => {
     navigate(`/chat/${configId}`);
@@ -113,6 +114,12 @@ const ConfigListPage = () => {
                 Manage and interact with your custom LLM configurations
               </p>
             </div>
+            {username && (
+              <div className="flex items-center space-x-3 bg-gray-800/50 border border-gray-700/50 rounded-full px-4 py-2">
+                <FaUser className="text-indigo-400" />
+                <span className="font-medium text-white">{username}</span>
+              </div>
+            )}
             <button
               onClick={handleCreateNew}
               className="flex items-center space-x-2 px-4 py-3 font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition-all active:scale-[0.98]"
@@ -148,7 +155,7 @@ const ConfigListPage = () => {
               {configs.length > 0 ? (
                 configs.map(config => (
                   <ConfigItem 
-                    key={config.config_id} 
+                    key={config._id} 
                     config={config} 
                     onSelect={handleSelectConfig} 
                     onEdit={handleEditConfig} 

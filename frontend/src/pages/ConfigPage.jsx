@@ -406,25 +406,34 @@ const ConfigPage = () => {
               </p>
             </div>
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className={`w-full py-3 px-6 rounded-lg font-medium flex items-center justify-center space-x-2 transition-all ${
-                isLoading ? 'bg-indigo-700' : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700'
-              } active:scale-[0.98]`}
-            >
-              {isLoading ? (
-                <div className="flex items-center space-x-2">
-                  <div className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent"></div>
-                  <span>Saving Configuration...</span>
-                </div>
-              ) : (
-                <>
-                  <span>Save & Start Chatting</span>
-                  <FaRobot className="text-sm" />
-                </>
-              )}
-            </button>
+            <div className="flex flex-col sm:flex-row items-center gap-4 pt-4">
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="w-full py-3 px-6 rounded-lg font-medium bg-gray-600 hover:bg-gray-700 transition-all active:scale-[0.98]"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className={`w-full py-3 px-6 rounded-lg font-medium flex items-center justify-center space-x-2 transition-all ${
+                  isLoading ? 'bg-indigo-700' : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700'
+                } active:scale-[0.98]`}
+              >
+                {isLoading ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent"></div>
+                    <span>Saving...</span>
+                  </div>
+                ) : (
+                  <>
+                    <span>Save & Start Chatting</span>
+                    <FaRobot className="text-sm" />
+                  </>
+                )}
+              </button>
+            </div>
           </form>
         </div>
       </div>

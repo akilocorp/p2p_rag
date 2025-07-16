@@ -31,7 +31,7 @@ load_dotenv()
 def create_app():
     """Factory function to create and configure the Flask application."""
     app = Flask(__name__)
-    CORS(app) 
+    CORS(app, resources={r"/api/*": {"origins": "http://localhost:5173"}}, supports_credentials=True) 
 
 
     

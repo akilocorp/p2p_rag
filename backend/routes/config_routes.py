@@ -6,6 +6,7 @@ import os
 from werkzeug.utils import secure_filename
 from src.utils.vector_stores.store_vector_stores import process_files_and_create_vector_store
 from models.config import Config
+from models.user import User
 
 import json
 from bson import ObjectId
@@ -107,30 +108,30 @@ def getconfigs():
     try:
         # 1. Get the user ID from the JWT token
         user_id= get_jwt_identity()
-        current_app.logger.info(f"user {user_id}: ", exc_info=True)
+
+        # Fetch user information to get the username
+        user = User.find_by_id(user_id)
+        username = user.get('username') if user else 'User'
+
+        # Fetch configurations owned by the user
+        configs_cursor = Config.get_collection().find({"user_id": user_id})
         
-        if user_id=='':
-            return jsonify({"error": "User not authenticated"}), 401
-
-        # 2. Query the database for all configs matching the user_id.
-        # This example assumes your Config model has a method like `find_by_user`.
-        # If not, you can use `current_app.config['MONGO_COLLECTION'].find({"userid": user_id})`
-        user_configs_cursor = Config.find_by_user_id(user_id)
-
-        # 3. Serialize the documents for the JSON response
+        # Convert cursor to a list of dictionaries
         configs_list = []
-        for config in user_configs_cursor:
-            # Convert the MongoDB ObjectId to a string and rename it for clarity
-            config['config_id'] = str(config.pop('_id'))
+        for config in configs_cursor:
+            config['_id'] = str(config['_id'])
             configs_list.append(config)
-        
-        # 4. Return the list of configurations
-        return jsonify({"configs": configs_list}), 200
+            
+        # Return both configs and username in a single response
+        return jsonify({
+            "configs": configs_list,
+            "username": username
+        }), 200
 
     except Exception as e:
-        if user_id:
-            current_app.logger.error(f"Error fetching configurations for user {user_id}: {e}", exc_info=True)
-        return jsonify({"message": "An internal server error occurred"}), 500
+        current_app.logger.error(f"An error occurred in /config_list: {e}", exc_info=True)
+        return jsonify({"error": "An internal server error occurred"}), 500
+
 @config_bp.route('/config/<string:config_id>', methods=['GET'])
 def get_single_config(config_id):
     logger.info(f'{config_id}',exc_info=True)

@@ -1,5 +1,6 @@
 Flask
-Flask-Cors
+Flask-PyMongo==2.3.0
+flask-cors
 Flask-Bcrypt
 Flask-JWT-Extended
 Flask-Mail
