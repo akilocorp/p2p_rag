@@ -82,24 +82,22 @@ const EditConfigPage = () => {
         collection_name: config.collection_name
       };
 
-      // Handle file upload
+      const formData = new FormData();
+      Object.entries(requestData).forEach(([key, value]) => {
+        formData.append(key, value);
+      });
+
       if (config.files && config.files.length > 0) {
-        const formData = new FormData();
-        Object.entries(requestData).forEach(([key, value]) => {
-          formData.append(key, value);
-        });
         config.files.forEach(file => {
           formData.append('files', file);
         });
-        
-        await apiClient.put(`/config/${config.config_id}`, formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          }
-        });
-      } else {
-        await apiClient.put(`/config/${config.config_id}`, requestData);
       }
+
+      await apiClient.put(`/config/${config.config_id}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
 
       // Navigate back to config list with refresh flag
       navigate('/config_list', { state: { refresh: true } });
