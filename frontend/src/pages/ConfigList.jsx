@@ -94,8 +94,11 @@ const ConfigListPage = () => {
     navigate(`/chat/${configId}`);
   };
 
-  const handleEditConfig = (config) => {
-    navigate('/edit-config', { state: { config } });
+  const onEdit = (config) => {
+    // The backend sends `_id`, but the frontend components might expect `config_id`.
+    // We ensure the object passed in state is consistent.
+    const configForEdit = { ...config, config_id: config._id };
+    navigate(`/edit-config`, { state: { config: configForEdit } });
   };
 
   const handleCreateNew = () => {
@@ -197,7 +200,7 @@ const ConfigListPage = () => {
                     key={config._id} 
                     config={config} 
                     onSelect={handleSelectConfig} 
-                    onEdit={handleEditConfig} 
+                    onEdit={onEdit} 
                   />
                 ))
               ) : (

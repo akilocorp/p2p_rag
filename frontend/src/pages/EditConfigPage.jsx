@@ -1,37 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import apiClient from '../api/apiClient';
-import { FaRobot, FaUpload, FaTrash, FaInfoCircle, FaFile } from 'react-icons/fa';
+import { FaRobot, FaUpload, FaTrash, FaInfoCircle, FaFile, FaSave, FaTimes } from 'react-icons/fa';
 
 const EditConfigPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [config, setConfig] = useState({
-    bot_name: '',
-    model_name: '',
-    temperature: 0.7,
-    max_tokens: 2000,
-    is_public: false,
-    instructions: '',
-    prompt_template: '',
-    collection_name: '',
-    files: []
+  // Initialize state directly from location.state to ensure config_id is present from the start.
+  const [config, setConfig] = useState(() => {
+    const configFromState = location.state?.config;
+    // Provide a full default structure to prevent controlled/uncontrolled input warnings.
+    return configFromState || {
+      bot_name: '',
+      model_name: '',
+      temperature: 0.7,
+      max_tokens: 2000,
+      is_public: false,
+      instructions: '',
+      prompt_template: '',
+      collection_name: '',
+      files: [],
+      config_id: null, // Ensure config_id is not undefined
+      _id: null, // Also ensure _id is available for the delete function
+    };
   });
+
   const [isLoading, setIsLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [errors, setErrors] = useState({});
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [promptMode, setPromptMode] = useState('instructions');
 
-  // Load config data on mount
+  // Effect to handle cases where the user navigates directly to the page without a config.
   useEffect(() => {
-    const initialConfig = location.state?.config;
-    if (initialConfig) {
-      setConfig({
-        ...config,
-        ...initialConfig,
-        files: initialConfig.files || []
-      });
+    if (!location.state?.config) {
+      navigate('/config_list', { state: { error: 'No configuration selected to edit.' } });
     }
-  }, [location]);
+  }, [location.state, navigate]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -111,105 +116,100 @@ const EditConfigPage = () => {
     }
   };
 
+  const handleDelete = () => {
+    setShowConfirmModal(true);
+  };
+
+  const confirmDelete = async () => {
+    setShowConfirmModal(false);
+    setIsDeleting(true);
+    try {
+      // The ID from MongoDB is `_id`.
+      await apiClient.delete(`/config/${config._id}`);
+      navigate('/config_list', { state: { refresh: true, message: 'Assistant deleted successfully.' } });
+    } catch (error) {
+      console.error('Error deleting configuration:', error);
+      setErrors({ form: 'Failed to delete configuration.' });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
-        <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-500">
-            Edit AI Assistant Configuration
+        <div className="text-center mb-8">
+          <h1 className="text-3xl sm:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-500">
+            Edit AI Assistant
           </h1>
         </div>
 
-        <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl shadow-xl border border-gray-700/50 p-8">
+        <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl shadow-xl border border-gray-700/50 p-4 sm:p-8">
           {errors.form && (
             <div className="mb-6 p-4 bg-red-900/50 rounded-xl border border-red-700/50">
               <p className="text-red-400">{errors.form}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Bot Name */}
+          <form onSubmit={handleSubmit} className="space-y-8">
+            {/* Chatbot Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Bot Name</label>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Chatbot Name</label>
               <input
                 type="text"
                 name="bot_name"
                 value={config.bot_name}
                 onChange={handleChange}
                 className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Enter bot name"
+                placeholder="My Awesome Assistant"
               />
-              {errors.bot_name && (
-                <p className="mt-1 text-sm text-red-400">{errors.bot_name}</p>
-              )}
+              {errors.bot_name && <p className="mt-1 text-sm text-red-400">{errors.bot_name}</p>}
             </div>
 
             {/* Model Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">AI Model</label>
-              <select
+              <label className="block text-sm font-medium text-gray-300 mb-2">Model Name</label>
+              <input
+                type="text"
                 name="model_name"
                 value={config.model_name}
                 onChange={handleChange}
                 className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                <option value="deepseek-chat">Deepseek Chat</option>
-                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                <option value="qwen-turbo">Qwen Turbo</option>
-              </select>
-            </div>
-
-            {/* Temperature */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Response Creativity</label>
-              <div className="flex items-center space-x-4">
-                <div className="flex-1">
-                  <input
-                    type="range"
-                    name="temperature"
-                    value={config.temperature}
-                    onChange={handleChange}
-                    min="0"
-                    max="2"
-                    step="0.1"
-                    className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer"
-                  />
-                </div>
-                <span className="text-sm text-gray-400">{(typeof config.temperature === 'number' ? config.temperature : parseFloat(config.temperature)).toFixed(1)}</span>
-              </div>
-              <p className="mt-1 text-xs text-gray-400">
-                Lower values make responses more deterministic and factual, higher values make them more creative and varied.
-              </p>
-            </div>
-
-            {/* Max Tokens */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Max Tokens</label>
-              <input
-                type="number"
-                name="max_tokens"
-                value={config.max_tokens}
-                onChange={handleChange}
-                className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="2000"
+                placeholder="e.g., gpt-4-turbo"
               />
+              {errors.model_name && <p className="mt-1 text-sm text-red-400">{errors.model_name}</p>}
             </div>
 
-            {/* Public/Private Toggle */}
-            <div>
-              <label className="flex items-center space-x-2">
+            {/* Temperature and Max Tokens */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Temperature</label>
                 <input
-                  type="checkbox"
-                  name="is_public"
-                  checked={config.is_public}
+                  type="number"
+                  name="temperature"
+                  value={config.temperature}
                   onChange={handleChange}
-                  className="w-4 h-4 text-indigo-500 bg-gray-700 border-gray-600 rounded focus:ring-indigo-500"
+                  step="0.1"
+                  min="0"
+                  max="2"
+                  className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
-                <span className="text-sm text-gray-300">Make Public</span>
-              </label>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Max Tokens</label>
+                <input
+                  type="number"
+                  name="max_tokens"
+                  value={config.max_tokens}
+                  onChange={handleChange}
+                  step="100"
+                  min="1"
+                  className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
             </div>
 
-            {/* Instructions/Prompt Template */}
+            {/* Prompt Mode Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Prompt Mode</label>
               <div className="flex space-x-4">
@@ -302,35 +302,76 @@ const EditConfigPage = () => {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row items-center gap-4 pt-4">
-               <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className="w-full py-3 px-6 rounded-lg font-medium bg-gray-600 hover:bg-gray-700 transition-all active:scale-[0.98]"
-              >
-                Cancel
-              </button>
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-between items-center gap-4 pt-4">
+              {/* Delete Button - aligned left on desktop */}
               <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all active:scale-[0.98]"
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting || isLoading}
+                className="w-full sm:w-auto flex justify-center items-center py-3 px-6 rounded-lg font-medium text-white bg-red-600 hover:bg-red-700 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Saving...
-                  </>
-                ) : (
-                  'Save Changes'
-                )}
+                <FaTrash className="mr-2" />
+                {isDeleting ? 'Deleting...' : 'Delete'}
               </button>
+
+              {/* Cancel and Save Buttons - grouped on the right */}
+              <div className="flex flex-col-reverse sm:flex-row items-center gap-4 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => navigate(-1)}
+                  className="w-full sm:w-auto flex items-center justify-center py-3 px-6 rounded-lg font-medium bg-gray-600 hover:bg-gray-700 transition-all active:scale-[0.98]"
+                >
+                  <FaTimes className="mr-2" />
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isLoading || isDeleting}
+                  className="w-full sm:w-auto flex justify-center items-center py-3 px-6 border border-transparent rounded-lg shadow-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all active:scale-[0.98] disabled:opacity-50"
+                >
+                  {isLoading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <FaSave className="mr-2" />
+                      Save Changes
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </form>
         </div>
       </div>
+
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-lg shadow-xl p-8 max-w-sm w-full mx-4">
+            <h3 className="text-xl font-bold text-white mb-4">Confirm Deletion</h3>
+            <p className="text-gray-300 mb-6">Are you sure you want to permanently delete this assistant? This action cannot be undone.</p>
+            <div className="flex justify-end gap-4">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="py-2 px-4 rounded-lg font-medium bg-gray-600 hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="py-2 px-4 rounded-lg font-medium text-white bg-red-600 hover:bg-red-700 transition-colors"
+              >
+                Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

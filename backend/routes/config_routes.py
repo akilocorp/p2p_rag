@@ -101,6 +101,45 @@ def update_config(config_id):
         current_app.logger.error(f"Error updating config {config_id}: {e}", exc_info=True)
         return jsonify({"error": "An internal server error occurred"}), 500
 
+@config_bp.route('/config/<string:config_id>', methods=['DELETE'])
+@jwt_required()
+def delete_config(config_id):
+    """
+    Deletes a configuration and its associated vector store collection.
+    Only the owner of the config can delete it.
+    """
+    try:
+        user_id = get_jwt_identity()
+        config_to_delete = Config.get_collection().find_one({
+            "_id": ObjectId(config_id),
+            "user_id": user_id
+        })
+
+        if not config_to_delete:
+            return jsonify({"message": "Configuration not found or access denied"}), 404
+
+        # Delete the configuration from MongoDB
+        Config.get_collection().delete_one({"_id": ObjectId(config_id)})
+
+        # Delete the associated vector store collection from ChromaDB
+        collection_name = config_to_delete.get('collection_name')
+        if collection_name:
+            try:
+                from src.utils.vector_stores.get_vector_store import get_vector_store
+                vector_store = get_vector_store(collection_name)
+                # This assumes the vector store client has a delete_collection method
+                vector_store._client.delete_collection(name=collection_name)
+                current_app.logger.info(f"Successfully deleted vector store collection: {collection_name}")
+            except Exception as e:
+                # Log if the collection deletion fails, but don't block the main deletion
+                current_app.logger.error(f"Failed to delete vector store collection '{collection_name}': {e}", exc_info=True)
+
+        return jsonify({"message": "Configuration deleted successfully"}), 200
+
+    except Exception as e:
+        current_app.logger.error(f"An error occurred in delete_config: {e}", exc_info=True)
+        return jsonify({"error": "An internal server error occurred"}), 500
+
 @config_bp.route('/config_list', methods=['GET'])
 @jwt_required()
 def getconfigs():
