@@ -98,7 +98,11 @@ const ConfigListPage = () => {
   };
 
   const onEdit = (config) => {
-    const configForEdit = { ...config, config_id: config._id };
+    const configForEdit = {
+      ...config,
+      _id: config._id,
+      documents: config.documents || [] // Ensure documents are included
+    };
     navigate(`/edit-config`, { state: { config: configForEdit } });
   };
 
@@ -178,7 +182,7 @@ const ConfigListPage = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {configs.map((config) => (
                     <ConfigItem
-                      key={config.config_id}
+                      key={config._id}
                       config={config}
                       onSelect={handleSelectConfig}
                       onEdit={onEdit}

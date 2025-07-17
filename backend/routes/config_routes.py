@@ -30,8 +30,16 @@ def update_config(config_id):
     """
     try:
         user_id = get_jwt_identity()
-        data = request.get_json()
-        is_public = data.get('is_public')
+        
+        # Handle both JSON and multipart/form-data
+        if request.is_json:
+            data = request.get_json()
+            is_public = data.get('is_public')
+            files = []
+        else:
+            data = request.form
+            is_public = data.get('is_public')
+            files = request.files.getlist('files')
 
         if is_public is None or not isinstance(is_public, bool):
             return jsonify({"error": "Missing or invalid 'is_public' field"}), 400
@@ -45,11 +53,57 @@ def update_config(config_id):
         if not config_to_update:
             return jsonify({"message": "Configuration not found or access denied"}), 404
 
+        # Prepare update data
+        update_data = {
+            "is_public": is_public,
+            "bot_name": data.get('bot_name'),
+            "model_name": data.get('model_name'),
+            "temperature": float(data.get('temperature', 0.7)),
+            "instructions": data.get('instructions'),
+            "prompt_template": data.get('prompt_template'),
+            "collection_name": data.get('collection_name')
+        }
+
         # Update the document in the database
         Config.get_collection().update_one(
             {"_id": ObjectId(config_id)},
-            {"$set": {"is_public": is_public}}
+            {"$set": update_data}
         )
+
+        # Handle file uploads if any
+        if files:
+            temp_file_paths = []
+            for file in files:
+                if file and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    temp_file_path = os.path.join(UPLOAD_FOLDER, filename)
+                    file.save(temp_file_path)
+                    temp_file_paths.append(temp_file_path)
+
+            if temp_file_paths:
+                # Get the config from the database to get user_id and collection_name
+                config = Config.get_collection().find_one({"_id": ObjectId(config_id)})
+                if config:
+                    user_id = config.get('user_id')
+                    collection_name = config.get('collection_name')
+                    if user_id and collection_name:
+                        try:
+                            process_files_and_create_vector_store(
+                                temp_file_paths,
+                                user_id,
+                                collection_name,
+                                config_id
+                            )
+                        except Exception as e:
+                            current_app.logger.error(f"Error processing files: {e}", exc_info=True)
+                            return jsonify({"error": "Failed to process uploaded files"}), 500
+                        finally:
+                            # Clean up temporary files
+                            for temp_file in temp_file_paths:
+                                try:
+                                    os.remove(temp_file)
+                                except Exception as e:
+                                    current_app.logger.error(f"Error removing temp file {temp_file}: {e}")
 
         return jsonify({"message": "Configuration updated successfully"}), 200
 
@@ -89,6 +143,11 @@ def delete_config(config_id):
             except Exception as e:
                 # Log if the collection deletion fails, but don't block the main deletion
                 current_app.logger.error(f"Failed to delete vector store collection '{collection_name}': {e}", exc_info=True)
+                # Return a warning but continue with the main deletion
+                return jsonify({
+                    "message": "Configuration deleted successfully",
+                    "warning": f"Failed to delete vector store collection: {str(e)}"
+                }), 200
 
         return jsonify({"message": "Configuration deleted successfully"}), 200
 
@@ -252,6 +311,9 @@ Answer:"""
         # --- 6. Save Configuration to MongoDB ---
         mongo_collection = Config
 
+        # Get the filenames of uploaded files
+        uploaded_filenames = [secure_filename(file.filename) for file in uploaded_files if file and allowed_file(file.filename)]
+        
         config_document = {
             "user_id": user_id,
             "bot_name": bot_name,
@@ -259,7 +321,8 @@ Answer:"""
             "model_name": llm_type,
             "prompt_template": final_prompt_template, # Save the dynamically created template
             "temperature": temperature,
-            "is_public":is_public
+            "is_public": is_public,
+            "documents": uploaded_filenames  # Store the filenames of uploaded documents
         }
         
         result = mongo_collection.get_collection().insert_one(config_document)
