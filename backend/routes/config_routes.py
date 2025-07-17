@@ -236,7 +236,7 @@ Answer:"""
         except (ValueError, TypeError):
             return jsonify({"error": "Temperature must be a number between 0.0 and 2.0"}), 400
 
-        # --- 5. Handle File Uploads (No change) ---
+        # --- 5. Handle File Uploads (Updated) ---
         os.makedirs(UPLOAD_FOLDER, exist_ok=True)
         temp_file_paths = []
         for file in uploaded_files:

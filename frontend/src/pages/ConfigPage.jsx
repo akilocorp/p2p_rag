@@ -33,7 +33,17 @@ const FileUpload = ({ onFileChange, initialFiles }) => {
 
   const handleFileChange = (e) => {
     const newFiles = Array.from(e.target.files);
-    const updatedFiles = [...files, ...newFiles];
+    const maxFileSize = 50 * 1024 * 1024; // 50MB
+    const updatedFiles = [...files];
+
+    newFiles.forEach(file => {
+      if (file.size > maxFileSize) {
+        alert(`File ${file.name} is too large. Maximum size is 50MB.`);
+        return;
+      }
+      updatedFiles.push(file);
+    });
+
     setFiles(updatedFiles);
     onFileChange(updatedFiles);
   };
@@ -64,7 +74,7 @@ const FileUpload = ({ onFileChange, initialFiles }) => {
           <p className={`text-sm ${isDragging ? 'text-indigo-400' : 'text-gray-400'}`}>
             {isDragging ? 'Drop files here' : 'Drag & drop files or click to browse'}
           </p>
-          <p className="text-xs text-gray-500 mt-1">Supports: TXT, PDF, DOCX, MD (Max 10MB each)</p>
+          <p className="text-xs text-gray-500 mt-1">Supports: TXT, PDF, DOCX, MD (Max 50MB each)</p>
         </div>
       </div>
       <input
@@ -158,7 +168,18 @@ const ConfigPage = () => {
     }
 
     const formData = new FormData();
-    config.rag_files.forEach(file => formData.append('files', file));
+    config.rag_files.forEach(file => {
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        setErrors({ form: `File ${file.name} is too large. Maximum size is 10MB.` });
+        return;
+      }
+      formData.append('files', file);
+    });
+
+    if (config.rag_files.length === 0) {
+      setErrors({ form: 'Please select at least one file to upload.' });
+      return;
+    }
 
     const configToSend = { ...config };
     delete configToSend.rag_files;
@@ -182,20 +203,29 @@ const ConfigPage = () => {
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
-        } 
+        },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          console.log(`Upload progress: ${percentCompleted}%`);
+        }
       });
       
       navigate(`/chat/${response.data.data._id}`);
 
     } catch (error) {
       console.error('Config error:', error);
+      let errorMessage = 'An unexpected error occurred';
+      
       if (error.response) {
-        setErrors({ form: error.response.data.error || 'An error occurred while saving configuration' });
+        errorMessage = error.response.data.error || errorMessage;
+        if (error.response.status === 413) {
+          errorMessage = 'File size too large. Maximum size is 10MB.';
+        }
       } else if (error.request) {
-        setErrors({ form: 'No response from server. Please check your connection' });
-      } else {
-        setErrors({ form: 'An unexpected error occurred' });
+        errorMessage = 'No response from server. Please check your connection';
       }
+      
+      setErrors({ form: errorMessage });
     } finally {
       setIsLoading(false);
     }

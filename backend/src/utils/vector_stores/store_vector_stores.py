@@ -18,6 +18,13 @@ def get_document_loader(file_path):
     Returns:
         A LangChain DocumentLoader instance or None if the file type is not supported.
     """
+    MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+    
+    # Check file size
+    if os.path.getsize(file_path) > MAX_FILE_SIZE:
+        current_app.logger.warning(f"File too large: {file_path}. Maximum size is 50MB.")
+        return None
+    
     _, file_extension = os.path.splitext(file_path)
     file_extension = file_extension.lower()
     
@@ -29,7 +36,7 @@ def get_document_loader(file_path):
         '.md': TextLoader,
     }
     
-    loader_class = loader_map.get(file_extension)
+    loader_class = loader_class = loader_map.get(file_extension)
     if loader_class:
         return loader_class(file_path=file_path)
     else:
@@ -69,7 +76,12 @@ def process_files_and_create_vector_store(temp_file_paths, user_id, collection_n
                 continue  # Skip unsupported file types
 
             current_app.logger.info(f"Loading document: {temp_file_path}")
-            pages = loader.load()
+            try:
+                pages = loader.load()
+                current_app.logger.info(f"Successfully loaded {len(pages)} pages from {temp_file_path}")
+            except Exception as e:
+                current_app.logger.error(f"Error loading document {temp_file_path}: {str(e)}")
+                continue
 
 
             # Split the document and add its chunks to the master list
@@ -78,11 +90,11 @@ def process_files_and_create_vector_store(temp_file_paths, user_id, collection_n
             for split in splits:
                 split.metadata['user_id'] = user_id
                 split.metadata['config_id'] = str(config_id) # Link chunk to the config
-                split.metadata['collection_name'] = collection_name,
+                split.metadata['collection_name'] = collection_name
 
             
             all_splits.extend(splits)
-            current_app.logger.info(f"Processed {len(splits)} chunks from {os.path.basename(temp_file_path)}.")
+            current_app.logger.info(f"Processed {len(splits)} chunks from {os.path.basename(temp_file_path)}. First chunk content: {splits[0].page_content[:100] if splits else 'No chunks'}")
 
         if not all_splits:
             current_app.logger.error("No documents could be processed from the provided files.")

@@ -15,3 +15,7 @@ langchain-deepseek
 Werkzeug
 gunicorn
 dashscope
+docx2txt
+PyPDF2
+pypdf
+
