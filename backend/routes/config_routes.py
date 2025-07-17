@@ -283,14 +283,3 @@ Answer:"""
     except Exception as e:
         current_app.logger.error(f"An error occurred in /config route: {e}", exc_info=True)
         return jsonify({"error": "An internal server error occurred"}), 500
-
-@config_bp.route('/logout', methods=['POST'])
-def logout():
-    """Logs the user out by unsetting the JWT cookie."""
-    try:
-        response = jsonify({"message": "Logout successful"})
-        unset_jwt_cookies(response)
-        return response, 200
-    except Exception as e:
-        current_app.logger.error(f"An error occurred during logout: {e}", exc_info=True)
-        return jsonify({"error": "An internal server error occurred during logout"}), 500

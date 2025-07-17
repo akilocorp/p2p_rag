@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from flask_jwt_extended import create_access_token, create_refresh_token
+from flask_jwt_extended import create_access_token, create_refresh_token, unset_jwt_cookies
 from bson import ObjectId # To handle MongoDB's _id
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadTimeSignature
 from flask_mail import Message
@@ -74,6 +74,18 @@ def register():
     except Exception as e:
         current_app.logger.error(f"Error in /register route: {e}")
         return jsonify({"error": "An internal server error occurred"}), 500
+
+@auth_bp.route('/logout', methods=['POST'])
+@jwt_required()
+def logout():
+    """Logs the user out by unsetting the JWT cookie."""
+    try:
+        response = jsonify({"message": "Logout successful"})
+        unset_jwt_cookies(response)
+        return response, 200
+    except Exception as e:
+        current_app.logger.error(f"An error occurred during logout: {e}", exc_info=True)
+        return jsonify({"error": "An internal server error occurred during logout"}), 500
 
 # ---> 2. Add the new /refresh endpoint
 @auth_bp.route('/refresh', methods=['POST'])

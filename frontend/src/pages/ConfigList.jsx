@@ -108,8 +108,10 @@ const ConfigListPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <UserInfo />
+      <div className="container mx-auto px-4 py-8 max-w-7xl relative">
+        <div className="absolute top-4 right-4 z-50">
+          <UserInfo />
+        </div>
         <div className="mt-8">
           {/* Modern header with subtle glass effect */}
           <div className="flex flex-col mb-12">
