@@ -131,8 +131,7 @@ const ConfigListPage = () => {
             </div>
           </div>
           
-          {/* Minimalist divider */}
-          <div className="h-px w-full bg-gradient-to-r from-transparent via-gray-800 to-transparent" />
+          
         </div>
 
         {/* Content area */}
