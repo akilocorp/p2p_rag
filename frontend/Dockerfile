@@ -1,4 +1,5 @@
 # --- Stage 1: Build the React App ---
+# --- Stage 1: Build the React App ---
 FROM node:20-alpine AS builder
 
 # Set the working directory
@@ -13,9 +14,12 @@ RUN npm install
 # Copy the rest of the application source code
 COPY . .
 
+# Set the API URL environment variable
+ARG API_URL
+ENV VITE_API_URL=${API_URL}
+
 # Build the production-ready static files
 RUN npm run build
-
 
 # --- Stage 2: Serve the App with Nginx ---
 FROM nginx:stable-alpine

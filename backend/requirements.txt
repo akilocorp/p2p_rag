@@ -1,5 +1,6 @@
 Flask
-Flask-Cors
+Flask-PyMongo==2.3.0
+flask-cors
 Flask-Bcrypt
 Flask-JWT-Extended
 Flask-Mail
@@ -13,3 +14,8 @@ langchain-community
 langchain-deepseek
 Werkzeug
 gunicorn
+dashscope
+docx2txt
+PyPDF2
+pypdf
+

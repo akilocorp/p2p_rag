@@ -11,7 +11,8 @@ import ConfigPage from './pages/ConfigPage';
 import ChatPage from './pages/ChatPage';
 import ConfigList from './pages/ConfigList';
 import EmailVerificationPage from './pages/EmailVerification';
-
+import SideBar from './components/SideBar'; // Import the SideBar component
+import EditConfigPage from './pages/EditConfigPage';
 
 // Import the ProtectedRoute component
 import ProtectedRoute from './components/ProtectedRoute'; 
@@ -22,38 +23,33 @@ function App() {
 
   return (
     <Router>
-      {/* <nav>
-        <ul>
-          <li><Link to="/register">Register</Link></li>
-          <li><Link to="/login">Login</Link></li>
-          <li><Link to="/config">Config (Protected)</Link></li>
-          <li><Link to="/chat">Chat (Protected)</Link></li>
-        </ul>
-      </nav> */}
+      <div className="min-h-screen bg-gray-900 text-white">
+        <Routes>
+          {/* Public Routes - No authentication required */}
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/verify-email" element={<EmailVerificationPage />} />
 
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/verify-email" element={<EmailVerificationPage />} /> {/* ---> 2. Add the public route */}
-        
-
-        {/* Protected Routes */}
-        <Route path="/chat/:configId/:chatId?" element={<ChatPage />} />
-
-        <Route element={<ProtectedRoute />}> {/* Use ProtectedRoute as a wrapper */}
-        <Route path="/config_list" element={<ConfigList />} />
-
-          <Route path="/config" element={<ConfigPage />} />
-
-        </Route>
-
-        {/* Optional: Redirect from root to login if no specific route */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
-
-        {/* Catch-all for 404 Not Found */}
-        <Route path="*" element={<div>404 Not Found</div>} />
-      </Routes>
+          {/* Protected Routes - Requires authentication */}
+          <Route element={<ProtectedRoute />}>
+            {/* Root route - Config List */}
+            <Route path="/" element={
+              <div className="flex flex-1">
+                <div className="flex-1">
+                  <Routes>
+                    <Route index element={<ConfigList />} />
+                  </Routes>
+                </div>
+              </div>
+            } />
+            {/* Protected routes */}
+            <Route path="/config" element={<ConfigPage />} />
+            <Route path="/edit-config" element={<EditConfigPage />} />
+            <Route path="/config_list" element={<ConfigList />} />
+            <Route path="/chat/:configId/:chatId?" element={<ChatPage />} />
+          </Route>
+        </Routes>
+      </div>
     </Router>
   );
 }

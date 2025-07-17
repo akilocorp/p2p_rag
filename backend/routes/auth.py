@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from flask_jwt_extended import create_access_token, create_refresh_token
+from flask_jwt_extended import create_access_token, create_refresh_token, unset_jwt_cookies
 from bson import ObjectId # To handle MongoDB's _id
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadTimeSignature
 from flask_mail import Message
@@ -75,6 +75,18 @@ def register():
         current_app.logger.error(f"Error in /register route: {e}")
         return jsonify({"error": "An internal server error occurred"}), 500
 
+@auth_bp.route('/logout', methods=['POST'])
+@jwt_required()
+def logout():
+    """Logs the user out by unsetting the JWT cookie."""
+    try:
+        response = jsonify({"message": "Logout successful"})
+        unset_jwt_cookies(response)
+        return response, 200
+    except Exception as e:
+        current_app.logger.error(f"An error occurred during logout: {e}", exc_info=True)
+        return jsonify({"error": "An internal server error occurred during logout"}), 500
+
 # ---> 2. Add the new /refresh endpoint
 @auth_bp.route('/refresh', methods=['POST'])
 @jwt_required(refresh=True) # This decorator ensures only a refresh token can be used
@@ -138,6 +150,28 @@ def verify_email():
     except Exception as e:
         current_app.logger.error(f"Error in /verify-email: {e}")
         return jsonify({"message": "An internal server error occurred"}), 500
+
+@auth_bp.route('/me', methods=['GET'])
+@jwt_required()
+def get_user_info():
+    """
+    Get the current user's information.
+    Requires a valid JWT token.
+    """
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.find_by_id(current_user_id)
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        
+        # Return user info without sensitive data
+        return jsonify({
+            "username": user['username'],
+            "email": user['email']
+        })
+    except Exception as e:
+        current_app.logger.error(f"Error in /me route: {e}")
+        return jsonify({"error": "An internal server error occurred"}), 500
 
 @auth_bp.route('/login', methods=['POST'])
 def login():

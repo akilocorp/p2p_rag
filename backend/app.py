@@ -31,7 +31,7 @@ load_dotenv()
 def create_app():
     """Factory function to create and configure the Flask application."""
     app = Flask(__name__)
-    CORS(app) 
+    CORS(app, resources={r"/api/*": {"origins": ["*"], "supports_credentials": True, "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}})
 
 
     
@@ -108,7 +108,6 @@ def create_app():
     def refresh():
     # Get the identity from the refresh token
         current_user_identity = get_jwt_identity()
-    
         # Create a new access token
         new_access_token = create_access_token(identity=current_user_identity)
         

@@ -8,7 +8,7 @@ WORKDIR /app
 # Copy only the requirements file first.
 # This step's cache will only be invalidated if requirements.txt changes.
 COPY requirements.txt .
-
+RUN pip install --no-cache-dir --timeout=100 -r requirements.txt
 # Install dependencies.
 # --no-cache-dir prevents pip from storing its cache within this layer, reducing size.
 # The '&& rm -rf ~/.cache/pip' cleans up any residual pip cache files after installation.

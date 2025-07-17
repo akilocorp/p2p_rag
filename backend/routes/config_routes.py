@@ -1,11 +1,12 @@
 from flask import Flask, Blueprint, request, jsonify, current_app
-from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request
+from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request, unset_jwt_cookies
 import urllib.parse
 import logging
 import os
 from werkzeug.utils import secure_filename
 from src.utils.vector_stores.store_vector_stores import process_files_and_create_vector_store
 from models.config import Config
+from models.user import User
 
 import json
 from bson import ObjectId
@@ -56,7 +57,44 @@ def update_config(config_id):
         current_app.logger.error(f"Error updating config {config_id}: {e}", exc_info=True)
         return jsonify({"error": "An internal server error occurred"}), 500
 
+@config_bp.route('/config/<string:config_id>', methods=['DELETE'])
+@jwt_required()
+def delete_config(config_id):
+    """
+    Deletes a configuration and its associated vector store collection.
+    Only the owner of the config can delete it.
+    """
+    try:
+        user_id = get_jwt_identity()
+        config_to_delete = Config.get_collection().find_one({
+            "_id": ObjectId(config_id),
+            "user_id": user_id
+        })
 
+        if not config_to_delete:
+            return jsonify({"message": "Configuration not found or access denied"}), 404
+
+        # Delete the configuration from MongoDB
+        Config.get_collection().delete_one({"_id": ObjectId(config_id)})
+
+        # Delete the associated vector store collection from ChromaDB
+        collection_name = config_to_delete.get('collection_name')
+        if collection_name:
+            try:
+                from src.utils.vector_stores.get_vector_store import get_vector_store
+                vector_store = get_vector_store(collection_name)
+                # This assumes the vector store client has a delete_collection method
+                vector_store._client.delete_collection(name=collection_name)
+                current_app.logger.info(f"Successfully deleted vector store collection: {collection_name}")
+            except Exception as e:
+                # Log if the collection deletion fails, but don't block the main deletion
+                current_app.logger.error(f"Failed to delete vector store collection '{collection_name}': {e}", exc_info=True)
+
+        return jsonify({"message": "Configuration deleted successfully"}), 200
+
+    except Exception as e:
+        current_app.logger.error(f"An error occurred in delete_config: {e}", exc_info=True)
+        return jsonify({"error": "An internal server error occurred"}), 500
 
 @config_bp.route('/config_list', methods=['GET'])
 @jwt_required()
@@ -89,6 +127,7 @@ def getconfigs():
         if user_id:
             current_app.logger.error(f"Error fetching configurations for user {user_id}: {e}", exc_info=True)
         return jsonify({"message": "An internal server error occurred"}), 500
+
 @config_bp.route('/config/<string:config_id>', methods=['GET'])
 def get_single_config(config_id):
     logger.info(f'{config_id}',exc_info=True)
@@ -126,10 +165,6 @@ def get_single_config(config_id):
     except Exception as e:
         current_app.logger.error(f"Error fetching config {config_id} for user {user_id}: {e}", exc_info=True)
         return jsonify({"message": "An internal server error occurred"}), 500
-
-
-
-
 
 @config_bp.route('/config', methods=['POST'])
 @jwt_required()
@@ -201,7 +236,7 @@ Answer:"""
         except (ValueError, TypeError):
             return jsonify({"error": "Temperature must be a number between 0.0 and 2.0"}), 400
 
-        # --- 5. Handle File Uploads (No change) ---
+        # --- 5. Handle File Uploads (Updated) ---
         os.makedirs(UPLOAD_FOLDER, exist_ok=True)
         temp_file_paths = []
         for file in uploaded_files:

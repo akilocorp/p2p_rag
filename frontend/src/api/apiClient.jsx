@@ -4,7 +4,10 @@ import axios from 'axios';
 
 // Create a new axios instance with a base URL
 const apiClient = axios.create({
-  baseURL: 'https://bitterlylab.com/api', // Your Flask backend's base URL
+
+  baseURL: '/api', // Use relative URL since we're using Nginx proxy
+  xsrfCookieName: 'csrftoken',
+  xsrfHeaderName: 'X-CSRFToken',
 });
 
 // --- Request Interceptor ---
@@ -48,7 +51,7 @@ apiClient.interceptors.response.use(
         }
 
         // Make a request to your /refresh endpoint
-        const response = await axios.post('http://localhost:5000/api/auth/refresh', {}, {
+        const response = await axios.post('https://backend:5000/api/auth/refresh', {}, {
           headers: { 'Authorization': `Bearer ${refreshToken}` }
         });
 
