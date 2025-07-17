@@ -4,7 +4,9 @@ import axios from 'axios';
 
 // Create a new axios instance with a base URL
 const apiClient = axios.create({
-  baseURL: 'http://localhost:5000/api', // Use localhost for browser access
+  baseURL: '/api', // Use relative URL since we're using Nginx proxy
+  xsrfCookieName: 'csrftoken',
+  xsrfHeaderName: 'X-CSRFToken',
 });
 
 // --- Request Interceptor ---

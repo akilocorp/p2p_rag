@@ -68,6 +68,12 @@ const ChatPage = () => {
   const inputRef = useRef(null);
 
   useEffect(() => {
+    // Ensure we have a valid configId
+    if (!configId || typeof configId !== 'string') {
+      setError("Invalid configuration selected");
+      return;
+    }
+
     const fetchConfigDetails = async () => {
       try {
         const response = await apiClient.get(`/config/${configId}`);

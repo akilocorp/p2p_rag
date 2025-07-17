@@ -25,12 +25,18 @@ def allowed_file(filename):
 @jwt_required()
 def update_config(config_id):
     """
-    Updates a configuration. It can handle both standard form data and multipart/form-data for file uploads.
+    Updates a configuration, such as its public status.
     Only the owner of the config can update it.
     """
     try:
         user_id = get_jwt_identity()
-        
+        data = request.get_json()
+        is_public = data.get('is_public')
+
+        if is_public is None or not isinstance(is_public, bool):
+            return jsonify({"error": "Missing or invalid 'is_public' field"}), 400
+
+        # Find the config ensuring it belongs to the authenticated user
         config_to_update = Config.get_collection().find_one({
             "_id": ObjectId(config_id),
             "user_id": user_id
@@ -39,60 +45,10 @@ def update_config(config_id):
         if not config_to_update:
             return jsonify({"message": "Configuration not found or access denied"}), 404
 
-        config_data = {}
-        if request.is_json:
-            config_data = request.get_json()
-        else: # Assumes multipart/form-data
-            config_data = request.form.to_dict()
-
-        update_fields = {}
-        allowed_fields = ['bot_name', 'model_name', 'temperature', 'max_tokens', 'is_public', 'instructions', 'prompt_template', 'collection_name']
-
-        for field in allowed_fields:
-            if field in config_data:
-                value = config_data[field]
-                if field == 'is_public':
-                    update_fields[field] = str(value).lower() in ['true', '1', 't']
-                elif field in ['temperature', 'max_tokens']:
-                    try:
-                        update_fields[field] = float(value) if '.' in str(value) else int(value)
-                    except (ValueError, TypeError):
-                        current_app.logger.warning(f"Could not convert {field} value '{value}' to a number.")
-                        continue
-                else:
-                    update_fields[field] = value
-
-        # Handle file uploads if present
-        if 'files' in request.files:
-            uploaded_files = request.files.getlist('files')
-            if uploaded_files:
-                os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-                temp_file_paths = []
-                collection_name = update_fields.get('collection_name', config_to_update.get('collection_name'))
-                
-                for file in uploaded_files:
-                    if file and file.filename and allowed_file(file.filename):
-                        filename = secure_filename(file.filename)
-                        temp_file_path = os.path.join(UPLOAD_FOLDER, filename)
-                        file.save(temp_file_path)
-                        temp_file_paths.append(temp_file_path)
-                    elif file and file.filename:
-                        current_app.logger.warning(f"File type not allowed for {file.filename}, skipping.")
-
-                if temp_file_paths:
-                    process_files_and_create_vector_store(
-                        temp_file_paths=temp_file_paths, 
-                        user_id=user_id, 
-                        collection_name=collection_name,
-                        config_id=ObjectId(config_id)
-                    )
-
-        if not update_fields:
-            return jsonify({"message": "No fields to update"}), 200
-
+        # Update the document in the database
         Config.get_collection().update_one(
             {"_id": ObjectId(config_id)},
-            {"$set": update_fields}
+            {"$set": {"is_public": is_public}}
         )
 
         return jsonify({"message": "Configuration updated successfully"}), 200
@@ -147,29 +103,30 @@ def getconfigs():
     try:
         # 1. Get the user ID from the JWT token
         user_id= get_jwt_identity()
-
-        # Fetch user information to get the username
-        user = User.find_by_id(user_id)
-        username = user.get('username') if user else 'User'
-
-        # Fetch configurations owned by the user
-        configs_cursor = Config.get_collection().find({"user_id": user_id})
+        current_app.logger.info(f"user {user_id}: ", exc_info=True)
         
-        # Convert cursor to a list of dictionaries
+        if user_id=='':
+            return jsonify({"error": "User not authenticated"}), 401
+
+        # 2. Query the database for all configs matching the user_id.
+        # This example assumes your Config model has a method like `find_by_user`.
+        # If not, you can use `current_app.config['MONGO_COLLECTION'].find({"userid": user_id})`
+        user_configs_cursor = Config.find_by_user_id(user_id)
+
+        # 3. Serialize the documents for the JSON response
         configs_list = []
-        for config in configs_cursor:
-            config['_id'] = str(config['_id'])
+        for config in user_configs_cursor:
+            # Convert the MongoDB ObjectId to a string and rename it for clarity
+            config['config_id'] = str(config.pop('_id'))
             configs_list.append(config)
-            
-        # Return both configs and username in a single response
-        return jsonify({
-            "configs": configs_list,
-            "username": username
-        }), 200
+        
+        # 4. Return the list of configurations
+        return jsonify({"configs": configs_list}), 200
 
     except Exception as e:
-        current_app.logger.error(f"An error occurred in /config_list: {e}", exc_info=True)
-        return jsonify({"error": "An internal server error occurred"}), 500
+        if user_id:
+            current_app.logger.error(f"Error fetching configurations for user {user_id}: {e}", exc_info=True)
+        return jsonify({"message": "An internal server error occurred"}), 500
 
 @config_bp.route('/config/<string:config_id>', methods=['GET'])
 def get_single_config(config_id):
@@ -208,10 +165,6 @@ def get_single_config(config_id):
     except Exception as e:
         current_app.logger.error(f"Error fetching config {config_id} for user {user_id}: {e}", exc_info=True)
         return jsonify({"message": "An internal server error occurred"}), 500
-
-
-
-
 
 @config_bp.route('/config', methods=['POST'])
 @jwt_required()
