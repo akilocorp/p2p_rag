@@ -247,17 +247,28 @@ const EditConfigPage = () => {
 
             {/* Temperature */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Temperature</label>
+              <label htmlFor="temperature" className="block text-sm font-medium text-gray-300 mb-2">
+                Temperature
+                <span className="text-xs text-gray-400 ml-2">
+                  ({config.temperature < 0.3 ? 'Precise' : config.temperature < 0.7 ? 'Balanced' : 'Creative'})
+                </span>
+              </label>
               <input
-                type="number"
+                id="temperature"
+                type="range"
                 name="temperature"
+                min="0"
+                max="1"
+                step="0.1"
                 value={config.temperature}
                 onChange={handleChange}
-                step="0.1"
-                min="0"
-                max="2"
-                className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
               />
+              <div className="flex justify-between text-xs text-gray-400 mt-1">
+                <span>Precise</span>
+                <span>Balanced</span>
+                <span>Creative</span>
+              </div>
             </div>
 
             {/* Prompt Mode Selection */}
@@ -338,7 +349,7 @@ const EditConfigPage = () => {
               {/* Display existing files */}
               {config.documents && config.documents.length > 0 && (
                 <div className="mt-4 space-y-2">
-                  <h3 className="text-sm font-medium text-gray-300">Knowledge Base Files:</h3>
+                  
                   <ul className="space-y-2">
                     {config.documents.map((fileName) => (
                       <li key={fileName} className="flex items-center justify-between bg-gray-700/50 p-2 rounded-md">
