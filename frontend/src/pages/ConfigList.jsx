@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import apiClient from '../api/apiClient';
 import { FaPlus, FaRobot, FaCog, FaSpinner } from 'react-icons/fa';
+import UserInfo from '../components/UserInfo';
 
 // Your perfect ConfigItem component remains exactly the same
 const ConfigItem = ({ config, onSelect, onEdit }) => {
@@ -107,25 +108,25 @@ const ConfigListPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <div className="container mx-auto px-4 py-12 sm:px-6 lg:px-8 max-w-7xl">
-        {/* Modern header with subtle glass effect */}
-        <div className="flex flex-col mb-12">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8">
-            <div className="space-y-2">
-              <h1 className="text-4xl sm:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 to-purple-400 tracking-tight">
-                AI Assistants
-              </h1>
-              <p className="text-gray-400/90 text-sm">
-                Manage your personalized AI configurations
-              </p>
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        <UserInfo />
+        <div className="mt-8">
+          {/* Modern header with subtle glass effect */}
+          <div className="flex flex-col mb-12">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8">
+              <div className="space-y-2">
+                <h1 className="text-4xl sm:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 to-purple-400 tracking-tight">
+                  AI Assistants
+                </h1>
+                <p className="text-gray-400/90 text-sm">
+                  Manage your personalized AI configurations
+                </p>
+              </div>
+              <button className="flex items-center px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-indigo-500/20" onClick={handleCreateNew}>
+                <FaPlus className="mr-3 text-sm" />
+                <span className="font-medium">New Assistant</span>
+              </button>
             </div>
-            <button
-              onClick={handleCreateNew}
-              className="flex items-center px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-indigo-500/20"
-            >
-              <FaPlus className="mr-3 text-sm" />
-              <span className="font-medium">New Assistant</span>
-            </button>
           </div>
           
           {/* Minimalist divider */}
