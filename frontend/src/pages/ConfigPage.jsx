@@ -419,7 +419,7 @@ const ConfigPage = () => {
 
             <div>
               <label htmlFor="collection_name" className="block text-sm font-medium text-gray-300 mb-2">
-                Knowledge Base Name
+                Collection Name
                 <span className="text-xs text-gray-400 ml-2">(Optional)</span>
               </label>
               <input

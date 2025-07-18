@@ -76,16 +76,26 @@ const EditConfigPage = () => {
     setConfig(prev => ({ ...prev, [name]: val }));
   };
 
-  const handleFileChange = (files) => {
-    // Update the documents array with new files
-    const updatedDocuments = [...config.documents, ...files.map(file => file.name)];
-    setConfig(prev => ({ ...prev, documents: updatedDocuments }));
+  const handleFileChange = (newFiles) => {
+    const updatedFiles = [...config.files, ...newFiles];
+    const updatedDocuments = updatedFiles.map(f => f.name);
+
+    setConfig(prev => ({
+      ...prev,
+      files: updatedFiles,
+      documents: updatedDocuments
+    }));
   };
 
   const handleRemoveFile = (fileName) => {
-    // Remove file from documents array
-    const updatedDocuments = config.documents.filter(doc => doc !== fileName);
-    setConfig(prev => ({ ...prev, documents: updatedDocuments }));
+    const updatedFiles = config.files.filter(file => file.name !== fileName);
+    const updatedDocuments = updatedFiles.map(f => f.name);
+
+    setConfig(prev => ({
+      ...prev,
+      files: updatedFiles,
+      documents: updatedDocuments
+    }));
   };
 
   const handlePromptModeChange = (mode) => {
@@ -234,14 +244,17 @@ const EditConfigPage = () => {
             {/* Model Name */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Model Name</label>
-              <input
-                type="text"
-                name="model_name"
-                value={config.model_name}
-                onChange={handleChange}
-                className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="e.g., gpt-4-turbo"
-              />
+              <select
+                  id="model_name"
+                  name="model_name"
+                  value={config.model_name}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 text-white bg-gray-700/70 border border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="deepseek-chat">Deepseek Chat</option>
+                  <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                  <option value="qwen-turbo">Qwen Turbo</option>
+                </select>
               {errors.model_name && <p className="mt-1 text-sm text-red-400">{errors.model_name}</p>}
             </div>
 

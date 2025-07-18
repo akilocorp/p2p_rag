@@ -21,96 +21,6 @@ def allowed_file(filename):
     """Checks if the uploaded file has an allowed extension."""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-@config_bp.route('/config/<string:config_id>', methods=['PUT'])
-@jwt_required()
-def update_config(config_id):
-    """
-    Updates a configuration, such as its public status.
-    Only the owner of the config can update it.
-    """
-    try:
-        user_id = get_jwt_identity()
-        
-        # Handle both JSON and multipart/form-data
-        if request.is_json:
-            data = request.get_json()
-            is_public = data.get('is_public')
-            files = []
-        else:
-            data = request.form
-            is_public = data.get('is_public')
-            files = request.files.getlist('files')
-
-        if is_public is None or not isinstance(is_public, bool):
-            return jsonify({"error": "Missing or invalid 'is_public' field"}), 400
-
-        # Find the config ensuring it belongs to the authenticated user
-        config_to_update = Config.get_collection().find_one({
-            "_id": ObjectId(config_id),
-            "user_id": user_id
-        })
-
-        if not config_to_update:
-            return jsonify({"message": "Configuration not found or access denied"}), 404
-
-        # Prepare update data
-        update_data = {
-            "is_public": is_public,
-            "bot_name": data.get('bot_name'),
-            "model_name": data.get('model_name'),
-            "temperature": float(data.get('temperature', 0.7)),
-            "instructions": data.get('instructions'),
-            "prompt_template": data.get('prompt_template'),
-            "collection_name": data.get('collection_name')
-        }
-
-        # Update the document in the database
-        Config.get_collection().update_one(
-            {"_id": ObjectId(config_id)},
-            {"$set": update_data}
-        )
-
-        # Handle file uploads if any
-        if files:
-            temp_file_paths = []
-            for file in files:
-                if file and allowed_file(file.filename):
-                    filename = secure_filename(file.filename)
-                    temp_file_path = os.path.join(UPLOAD_FOLDER, filename)
-                    file.save(temp_file_path)
-                    temp_file_paths.append(temp_file_path)
-
-            if temp_file_paths:
-                # Get the config from the database to get user_id and collection_name
-                config = Config.get_collection().find_one({"_id": ObjectId(config_id)})
-                if config:
-                    user_id = config.get('user_id')
-                    collection_name = config.get('collection_name')
-                    if user_id and collection_name:
-                        try:
-                            process_files_and_create_vector_store(
-                                temp_file_paths,
-                                user_id,
-                                collection_name,
-                                config_id
-                            )
-                        except Exception as e:
-                            current_app.logger.error(f"Error processing files: {e}", exc_info=True)
-                            return jsonify({"error": "Failed to process uploaded files"}), 500
-                        finally:
-                            # Clean up temporary files
-                            for temp_file in temp_file_paths:
-                                try:
-                                    os.remove(temp_file)
-                                except Exception as e:
-                                    current_app.logger.error(f"Error removing temp file {temp_file}: {e}")
-
-        return jsonify({"message": "Configuration updated successfully"}), 200
-
-    except Exception as e:
-        current_app.logger.error(f"Error updating config {config_id}: {e}", exc_info=True)
-        return jsonify({"error": "An internal server error occurred"}), 500
-
 @config_bp.route('/config/<string:config_id>', methods=['DELETE'])
 @jwt_required()
 def delete_config(config_id):
@@ -175,8 +85,9 @@ def getconfigs():
         # 3. Serialize the documents for the JSON response
         configs_list = []
         for config in user_configs_cursor:
-            # Convert the MongoDB ObjectId to a string and rename it for clarity
             config['config_id'] = str(config.pop('_id'))
+            # Ensure 'collection_name' is present, defaulting to an empty string if not
+            config['collection_name'] = config.get('collection_name', '')
             configs_list.append(config)
         
         # 4. Return the list of configurations
@@ -219,7 +130,8 @@ def get_single_config(config_id):
 
         # 5. Serialize the document for the JSON response
         # Convert the ObjectId to a string so it's JSON serializable
-        config_document["_id"] = str(config_document["_id"])
+        config_document["config_id"] = str(config_document.pop("_id"))
+        config_document['collection_name'] = config_document.get('collection_name', '')
         return jsonify({"config": config_document}), 200
     except Exception as e:
         current_app.logger.error(f"Error fetching config {config_id} for user {user_id}: {e}", exc_info=True)
@@ -317,7 +229,7 @@ Answer:"""
         config_document = {
             "user_id": user_id,
             "bot_name": bot_name,
-            "collection": collection_name,
+            "collection_name": collection_name,
             "model_name": llm_type,
             "prompt_template": final_prompt_template, # Save the dynamically created template
             "temperature": temperature,
@@ -331,12 +243,20 @@ Answer:"""
 
         # --- 7. Process Files (No change) ---
         if temp_file_paths:
+            # Use the provided collection name, or generate one if it's empty
+            final_collection_name = collection_name if collection_name else f"config_{config_id}"
             process_files_and_create_vector_store(
                 temp_file_paths=temp_file_paths, 
                 user_id=user_id, 
-                collection_name=collection_name,
+                collection_name=final_collection_name,
                 config_id=config_id
             )
+            # Update the config with the final collection name if it was generated
+            if not collection_name:
+                Config.get_collection().update_one(
+                    {"_id": config_id},
+                    {"$set": {"collection_name": final_collection_name}}
+                )
         
         return jsonify({
             "message": "Configuration saved successfully!",
