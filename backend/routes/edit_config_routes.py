@@ -114,7 +114,7 @@ def delete_config(config_id):
             
             # 1. Delete associated vector chunks from vector_collection
             vector_collection = db['vector_collection']
-            vector_result = vector_collection.delete_many({"metadata.config_id": config_id})
+            vector_result = vector_collection.delete_many({"config_id": config_id})
             current_app.logger.info(f"Deleted {vector_result.deleted_count} vector chunks for config_id: {config_id}")
 
             # 2. Find all chat sessions associated with this config_id
