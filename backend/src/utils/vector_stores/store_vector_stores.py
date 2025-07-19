@@ -110,7 +110,7 @@ def process_files_and_create_vector_store(temp_file_paths, user_id, collection_n
             documents=all_splits,
             embedding=embeddings,
             collection=mongo_collection,
-            index_name="vector_index"
+            index_name="vector"
         )
         current_app.logger.info("Successfully inserted vectors into MongoDB Atlas.")
        

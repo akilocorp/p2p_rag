@@ -5,7 +5,7 @@ import re
 import json
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.runnables import RunnablePassthrough
+from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from langchain_core.output_parsers import StrOutputParser
 from langchain_mongodb.vectorstores import MongoDBAtlasVectorSearch
 from langchain_mongodb.chat_message_histories import MongoDBChatMessageHistory
@@ -171,13 +171,30 @@ def chat(config_id, chat_id):
         vector_store = MongoDBAtlasVectorSearch(
             collection=db['vector_collection'],
             embedding=current_app.config['EMBEDDINGS'],
-            index_name="vector_index"
+            index_name="vector"
         )
         
-        retriever = vector_store.as_retriever(
-            search_type="mmr",
-            search_kwargs={"k": 3, "pre_filter": {"config_id": {"$eq": config_id}}}
-        )
+        # Create a custom retriever function that includes filtering
+        def filtered_retriever(query):
+            try:
+                # Use similarity search with filter
+                docs = vector_store.similarity_search(
+                    query=query,
+                    k=3,
+                    pre_filter={"config_id": {"$eq": config_id}}
+                )
+                logger.info(f"🔍 Vector search found {len(docs)} documents for config_id: {config_id}")
+                if docs:
+                    logger.info(f"📄 First document preview: {docs[0].page_content[:200]}...")
+                    logger.info(f"📋 Document metadata: {docs[0].metadata}")
+                else:
+                    logger.warning(f"⚠️ No documents found in vector store for config_id: {config_id}")
+                return docs
+            except Exception as e:
+                logger.error(f"❌ Vector retrieval failed: {e}")
+                return []
+        
+
         
         system_prompt_template = re.sub(r'Question:.*', '', config_document.get("prompt_template", "")).strip()
         prompt = ChatPromptTemplate.from_messages([
@@ -201,11 +218,18 @@ def chat(config_id, chat_id):
             return jsonify({"message": f"Unsupported model: {model_name}"}), 400
 
         def format_docs(docs):
-            return "\n\n".join(doc.page_content for doc in docs)
+            context = "\n\n".join(doc.page_content for doc in docs)
+            logger.info(f"📝 Context being sent to LLM ({len(docs)} docs, {len(context)} chars): {context[:300]}...")
+            return context
 
+        # Convert functions to runnables
+        question_to_retriever = RunnableLambda(lambda x: x["question"])
+        retriever_runnable = RunnableLambda(filtered_retriever)
+        format_docs_runnable = RunnableLambda(format_docs)
+        
         rag_chain = (
             RunnablePassthrough.assign(
-                context=(lambda x: x["question"]) | retriever | format_docs
+                context=question_to_retriever | retriever_runnable | format_docs_runnable
             )
             | prompt
             | llm
@@ -219,12 +243,26 @@ def chat(config_id, chat_id):
             history_messages_key="history",
         )
 
+        # Get docs once for both context and sources
+        docs = filtered_retriever(user_input)
+        context = format_docs(docs)
+        
+        # Run the RAG chain
         response_content = chain_with_history.invoke(
-            {"question": user_input},
+            {"question": user_input, "context": context},
             config={"configurable": {"session_id": chat_id}}
         )
-
-        return jsonify({"response": response_content})
+        
+        # Return response with sources
+        return jsonify({
+            "response": response_content,
+            "sources": [
+                {
+                    "source": doc.metadata.get("source", ""),
+                    "page_content": doc.page_content[:200] + "..."
+                } for doc in docs
+            ]
+        })
 
     except Exception as e:
         logger.error(f"An unexpected error occurred in the chat endpoint: {e}", exc_info=True)

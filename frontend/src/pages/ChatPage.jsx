@@ -8,7 +8,7 @@ import { FaSpinner } from 'react-icons/fa';
 import { ChatSidebar } from '../components/SideBar';
 
 const ChatMessage = ({ message }) => {
-  const { sender, text, isTyping } = message;
+  const { sender, text, isTyping, sources } = message;
   const isUser = sender === 'user';
 
   const createMarkup = (markdownText) => {
@@ -39,6 +39,17 @@ const ChatMessage = ({ message }) => {
             className="prose prose-invert max-w-none text-gray-100"
             dangerouslySetInnerHTML={createMarkup(text)}
           />
+        )}
+        {sources && sources.length > 0 && (
+          <div className="mt-3 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm">
+            <h4 className="text-gray-700 dark:text-gray-300 mb-2 font-medium">Sources:</h4>
+            {sources.map((source, idx) => (
+              <div key={idx} className="mb-3 pb-3 border-b border-gray-200 dark:border-gray-700 last:border-0">
+                <div><strong className="text-gray-600 dark:text-gray-400">Document:</strong> {source.source}</div>
+                <div className="text-gray-500 dark:text-gray-400 mt-1">{source.page_content}</div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
       {isUser && (
@@ -106,7 +117,8 @@ const ChatPage = () => {
         const response = await apiClient.get(`/history/${chatId}`);
         const formattedMessages = response.data.history.map(item => ({
           sender: item.type === 'human' ? 'user' : 'ai',
-          text: item.data?.content || ''
+          text: item.data?.content || '',
+          sources: item.data?.sources || []
         }));
         setMessages(formattedMessages);
       } catch (error) {
@@ -179,14 +191,11 @@ const ChatPage = () => {
         navigate(`/chat/${configId}/${targetChatId}`, { replace: true });
       }
 
-      setMessages(prev => {
-        const updated = [...prev];
-        updated[updated.length - 1] = {
-          sender: 'ai',
-          text: response.data.response
-        };
-        return updated;
-      });
+      setMessages(prev => [
+        ...prev,
+        { sender: 'user', text: userMessage.text, sources: [] },
+        { sender: 'ai', text: response.data.response, sources: response.data.sources || [] }
+      ]);
 
     } catch (error) {
       console.error("Chat error:", error);
