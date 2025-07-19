@@ -231,7 +231,7 @@ const LoginPage = () => {
         </div>
 
         <div className="mt-8 text-center text-xs text-gray-500">
-          <p>© {new Date().getFullYear()} Your Company. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} All rights reserved.</p>
         </div>
       </div>
     </div>
