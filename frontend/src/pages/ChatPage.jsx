@@ -274,7 +274,7 @@ const ChatPage = () => {
           </div>
         )}
 
-        <header className="p-4 bg-gray-900 border-b border-gray-800 z-0">
+        <header className="p-4 bg-gray-900 ">
           <div className="container mx-auto flex items-center justify-between">
             <button 
               className="md:hidden p-2 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-400"
