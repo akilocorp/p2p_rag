@@ -1,43 +1,67 @@
 import React from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
+import apiClient from '../api/apiClient';
 import { 
   FiMessageSquare, 
   FiPlus, 
   FiSettings, 
   FiClock,
   FiChevronRight,
-  FiChevronLeft
+  FiChevronLeft,
+  FiLoader,
+  FiUser,
+  FiLogOut
 } from 'react-icons/fi';
 import { RiRobot2Line } from 'react-icons/ri';
 
-export const ChatSidebar = ({ sessions = [], configId, isCollapsed, onClose, onToggle }) => {
+export const ChatSidebar = ({ 
+  sessions = [], 
+  sessionsLoading = false,
+  userInfo = null,
+  userInfoLoaded = false,
+  configId, 
+  isCollapsed, 
+  onClose, 
+  onToggle,
+  onNewChat 
+}) => {
   const { chatId: activeChatId } = useParams();
+  const navigate = useNavigate();
+
+  const handleNewChatClick = (e) => {
+    if (onNewChat) {
+      e.preventDefault();
+      onNewChat();
+      setTimeout(() => {
+        window.location.href = `/chat/${configId}`;
+      }, 0);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await apiClient.post('/auth/logout');
+      localStorage.removeItem('jwtToken');
+      localStorage.removeItem('refreshToken');
+      navigate('/login');
+    } catch (error) {
+      console.error('Error during logout:', error);
+    }
+  };
 
   const menuItems = [
-    {
-      icon: <FiMessageSquare className="w-5 h-5" />,
-      text: 'Chat History',
-      link: `/chat/${configId}`,
-      active: activeChatId === undefined
-    },
     {
       icon: <FiPlus className="w-5 h-5" />,
       text: 'New Chat',
       link: `/chat/${configId}`,
-      active: false
-    },
-    {
-      icon: <FiSettings className="w-5 h-5" />,
-      text: 'Settings',
-      link: `/settings/${configId}`,
-      active: false
+      active: activeChatId === undefined,
+      onClick: handleNewChatClick
     },
     {
       icon: <FiChevronLeft className="w-5 h-5" />,
       text: 'Configs',
       link: `/config_list`,
       active: false
-      // onClick={() => navigate('/config_list')}
     },
   ];
 
@@ -45,15 +69,15 @@ export const ChatSidebar = ({ sessions = [], configId, isCollapsed, onClose, onT
     <aside className={`bg-gray-800/50 backdrop-blur-lg border-r border-gray-700/30 text-white h-full fixed z-[50] transition-all duration-300 overflow-y-auto ${
       isCollapsed ? 'w-20' : 'w-72'
     }`}>
-      {/* Mobile close button (only shown on mobile) */}
+      {/* Mobile close button */}
       <button 
-        className="absolute right-10 top-0 -mr-10 mt-4 p-2 rounded-full bg-gray-800/50  text-gray-400 hover:text-gray-300 transition-colors md:hidden"
+        className="absolute right-10 top-0 -mr-10 mt-4 p-2 rounded-full bg-gray-800/50 text-gray-400 hover:text-gray-300 transition-colors md:hidden"
         onClick={onClose}
       >
         <FiChevronLeft className="w-5 h-5" />
       </button>
       
-      {/* Desktop toggle button (only shown on desktop) */}
+      {/* Desktop toggle button */}
       <button 
         className="absolute right-10 top-0 -mr-10 mt-4 p-2 rounded-full bg-gray-800/50 hover:bg-gray-700/50 text-gray-400 hover:text-gray-300 transition-colors hidden md:block"
         onClick={onToggle}
@@ -86,6 +110,7 @@ export const ChatSidebar = ({ sessions = [], configId, isCollapsed, onClose, onT
             <Link
               key={index}
               to={item.link}
+              onClick={item.onClick}
               className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-3 px-4'} py-3 rounded-xl transition-all ${
                 item.active
                   ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
@@ -123,7 +148,14 @@ export const ChatSidebar = ({ sessions = [], configId, isCollapsed, onClose, onT
             </div>
 
             <div className="space-y-1">
-              {sessions.length > 0 ? (
+              {sessionsLoading ? (
+                <div className="flex items-center justify-center p-6">
+                  <div className="flex flex-col items-center space-y-3">
+                    <FiLoader className="animate-spin text-2xl text-indigo-400" />
+                    <p className="text-gray-500 text-sm">Loading recent chats...</p>
+                  </div>
+                </div>
+              ) : sessions.length > 0 ? (
                 sessions.map((session) => (
                   <Link
                     key={session.session_id}
@@ -167,23 +199,48 @@ export const ChatSidebar = ({ sessions = [], configId, isCollapsed, onClose, onT
           </div>
         )}
 
-        {/* User Profile (Optional) */}
+        {/* User Profile */}
         <div className="mt-auto pt-4 border-t border-gray-700/50">
-          <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-3 px-2'} py-3 rounded-lg hover:bg-gray-700/30 cursor-pointer transition-colors`}>
-            <div className="w-8 h-8 rounded-full bg-indigo-500/10 flex items-center justify-center">
-              <span className="text-xs font-medium text-indigo-400">U</span>
-            </div>
-            {!isCollapsed && (
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">User Account</p>
-                <p className="text-xs text-gray-500 truncate">Free Plan</p>
+          {userInfoLoaded && (
+            userInfo ? (
+              <div className="space-y-2">
+                <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-3 px-2'} py-3 rounded-lg hover:bg-gray-700/30 cursor-pointer transition-colors`}>
+                  <div className="w-8 h-8 rounded-full bg-indigo-500/10 flex items-center justify-center">
+                    <FiUser className="text-indigo-400" />
+                  </div>
+                  {!isCollapsed && (
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">{userInfo.username}</p>
+                      <p className="text-xs text-gray-500 truncate">{userInfo.email || 'User Account'}</p>
+                    </div>
+                  )}
+                </div>
+                {!isCollapsed && (
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center space-x-3 px-2 py-2 rounded-lg hover:bg-red-900/30 text-gray-400 hover:text-red-400 transition-colors"
+                  >
+                    <FiLogOut className="text-sm" />
+                    <span className="text-sm">Logout</span>
+                  </button>
+                )}
               </div>
-            )}
-          </div>
+            ) : (
+              <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-3 px-2'} py-3 rounded-lg hover:bg-gray-700/30 cursor-pointer transition-colors`}>
+                <div className="w-8 h-8 rounded-full bg-gray-500/10 flex items-center justify-center">
+                  <FiUser className="text-gray-400" />
+                </div>
+                {!isCollapsed && (
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-400 truncate">Guest User</p>
+                    <p className="text-xs text-gray-500 truncate">Not logged in</p>
+                  </div>
+                )}
+              </div>
+            )
+          )}
         </div>
       </div>
     </aside>
   );
 };
-
-export default ChatSidebar;
