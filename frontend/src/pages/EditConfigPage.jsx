@@ -1,27 +1,48 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { FaFile, FaInfoCircle, FaRobot, FaSave, FaTimes, FaTrash, FaUpload } from 'react-icons/fa';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+
 import apiClient from '../api/apiClient';
-import { FaRobot, FaUpload, FaTrash, FaInfoCircle, FaFile, FaSave, FaTimes } from 'react-icons/fa';
 
 const EditConfigPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  // Initialize state directly from location.state to ensure config_id is present from the start.
   const [config, setConfig] = useState(() => {
     const configFromState = location.state?.config;
-    // Provide a full default structure to prevent controlled/uncontrolled input warnings.
-    return configFromState || {
-      bot_name: '',
-      model_name: '',
-      temperature: 0.7,
-      max_tokens: 2000,
-      is_public: false,
-      instructions: '',
-      prompt_template: '',
-      collection_name: '',
-      files: [],
-      config_id: null, // Ensure config_id is not undefined
-      _id: null, // Also ensure _id is available for the delete function
+    if (!configFromState) {
+      console.error('No config received in state');
+      return {
+        bot_name: '',
+        model_name: '',
+        temperature: 0.7,
+        is_public: false,
+        instructions: '',
+        prompt_template: '',
+        collection_name: '',
+        documents: [],
+        config_id: null
+      };
+    }
+    
+    // Ensure we have a valid ID
+    if (!configFromState.config_id) {
+      console.error('Config state has no valid ID');
+      return {
+        ...configFromState,
+        files: configFromState.documents?.map(doc => ({
+          name: doc,
+          size: 0
+        })) || [],
+        config_id: null
+      };
+    }
+    
+    return {
+      ...configFromState,
+      files: configFromState.documents?.map(doc => ({
+        name: doc,
+        size: 0
+      })) || []
     };
   });
 
@@ -35,7 +56,19 @@ const EditConfigPage = () => {
   useEffect(() => {
     if (!location.state?.config) {
       navigate('/config_list', { state: { error: 'No configuration selected to edit.' } });
+      return;
     }
+
+    // Initialize config with documents from state
+    const configFromState = location.state.config;
+    setConfig(prev => ({
+      ...prev,
+      ...configFromState,
+      files: configFromState.documents?.map(doc => ({
+        name: doc,
+        size: 0 // We don't have the actual size here
+      })) || []
+    }));
   }, [location.state, navigate]);
 
   const handleChange = (e) => {
@@ -44,8 +77,26 @@ const EditConfigPage = () => {
     setConfig(prev => ({ ...prev, [name]: val }));
   };
 
-  const handleFileChange = (files) => {
-    setConfig(prev => ({ ...prev, files }));
+  const handleFileChange = (newFiles) => {
+    const updatedFiles = [...config.files, ...newFiles];
+    const updatedDocuments = updatedFiles.map(f => f.name);
+
+    setConfig(prev => ({
+      ...prev,
+      files: updatedFiles,
+      documents: updatedDocuments
+    }));
+  };
+
+  const handleRemoveFile = (fileName) => {
+    const updatedFiles = config.files.filter(file => file.name !== fileName);
+    const updatedDocuments = updatedFiles.map(f => f.name);
+
+    setConfig(prev => ({
+      ...prev,
+      files: updatedFiles,
+      documents: updatedDocuments
+    }));
   };
 
   const handlePromptModeChange = (mode) => {
@@ -53,6 +104,8 @@ const EditConfigPage = () => {
   };
 
   const handleSubmit = async (e) => {
+    console.log('Current config state:', config); // Debug log
+    console.log('ID in config:', config.config_id);
     e.preventDefault();
     setIsLoading(true);
     setErrors({});
@@ -60,12 +113,12 @@ const EditConfigPage = () => {
     try {
       // Basic validation
       const newErrors = {};
-      if (!config.bot_name.trim()) newErrors.bot_name = 'Chatbot name is required';
-      if (!config.model_name.trim()) newErrors.model_name = 'Model name is required';
-      if (promptMode === 'instructions' && !config.instructions.trim()) {
+      if (!config.bot_name?.trim()) newErrors.bot_name = 'Chatbot name is required';
+      if (!config.model_name?.trim()) newErrors.model_name = 'Model name is required';
+      if (promptMode === 'instructions' && !config.instructions?.trim()) {
         newErrors.instructions = 'Instructions are required';
       }
-      if (promptMode === 'template' && !config.prompt_template.trim()) {
+      if (promptMode === 'template' && !config.prompt_template?.trim()) {
         newErrors.prompt_template = 'Prompt template is required';
       }
 
@@ -77,31 +130,42 @@ const EditConfigPage = () => {
 
       // Prepare request data
       const requestData = {
-        bot_name: config.bot_name,
-        model_name: config.model_name,
-        temperature: config.temperature,
-        max_tokens: config.max_tokens,
-        is_public: config.is_public,
-        instructions: config.instructions,
-        prompt_template: config.prompt_template,
-        collection_name: config.collection_name
+        bot_name: config.bot_name || '',
+        model_name: config.model_name || '',
+        temperature: config.temperature || 0.7,
+        is_public: config.is_public || false,
+        instructions: config.instructions || '',
+        prompt_template: config.prompt_template || '',
+        collection_name: config.collection_name || ''
       };
 
-      const formData = new FormData();
-      Object.entries(requestData).forEach(([key, value]) => {
-        formData.append(key, value);
-      });
-
+      // Determine if we need to use FormData based on whether files exist
+      let configData;
+      let configHeaders = {};
+      
       if (config.files && config.files.length > 0) {
+        const formData = new FormData();
+        Object.entries(requestData).forEach(([key, value]) => {
+          formData.append(key, value);
+        });
         config.files.forEach(file => {
           formData.append('files', file);
         });
+        configData = formData;
+        configHeaders = {
+          'Content-Type': 'multipart/form-data'
+        };
+      } else {
+        configData = requestData;
+        configHeaders = {
+          'Content-Type': 'application/json'
+        };
       }
 
-      await apiClient.put(`/config/${config.config_id}`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
+      // Debug log the ID before making the request
+      console.log('Sending PUT request with ID:', config.config_id);
+      await apiClient.put(`/config/${config.config_id}`, configData, {
+        headers: configHeaders
       });
 
       // Navigate back to config list with refresh flag
@@ -124,9 +188,21 @@ const EditConfigPage = () => {
     setShowConfirmModal(false);
     setIsDeleting(true);
     try {
-      // The ID from MongoDB is `_id`.
-      await apiClient.delete(`/config/${config._id}`);
-      navigate('/config_list', { state: { refresh: true, message: 'Assistant deleted successfully.' } });
+      // Log the ID to debug
+      console.log('Deleting config with ID:', config.config_id);
+      
+      // Ensure we have a valid ID
+      if (!config.config_id) {
+        throw new Error('No valid ID found');
+      }
+
+      // Use the correct API endpoint
+      const response = await apiClient.delete(`/config/${config.config_id}`);
+      if (response.status === 200) {
+        navigate('/config_list', { state: { refresh: true, message: 'Assistant deleted successfully.' } });
+      } else {
+        throw new Error('Failed to delete configuration');
+      }
     } catch (error) {
       console.error('Error deleting configuration:', error);
       setErrors({ form: 'Failed to delete configuration.' });
@@ -169,43 +245,43 @@ const EditConfigPage = () => {
             {/* Model Name */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Model Name</label>
-              <input
-                type="text"
-                name="model_name"
-                value={config.model_name}
-                onChange={handleChange}
-                className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="e.g., gpt-4-turbo"
-              />
+              <select
+                  id="model_name"
+                  name="model_name"
+                  value={config.model_name}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 text-white bg-gray-700/70 border border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="deepseek-chat">Deepseek Chat</option>
+                  <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                  <option value="qwen-turbo">Qwen Turbo</option>
+                </select>
               {errors.model_name && <p className="mt-1 text-sm text-red-400">{errors.model_name}</p>}
             </div>
 
-            {/* Temperature and Max Tokens */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Temperature</label>
-                <input
-                  type="number"
-                  name="temperature"
-                  value={config.temperature}
-                  onChange={handleChange}
-                  step="0.1"
-                  min="0"
-                  max="2"
-                  className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Max Tokens</label>
-                <input
-                  type="number"
-                  name="max_tokens"
-                  value={config.max_tokens}
-                  onChange={handleChange}
-                  step="100"
-                  min="1"
-                  className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                />
+            {/* Temperature */}
+            <div>
+              <label htmlFor="temperature" className="block text-sm font-medium text-gray-300 mb-2">
+                Temperature
+                <span className="text-xs text-gray-400 ml-2">
+                  ({config.temperature < 0.3 ? 'Precise' : config.temperature < 0.7 ? 'Balanced' : 'Creative'})
+                </span>
+              </label>
+              <input
+                id="temperature"
+                type="range"
+                name="temperature"
+                min="0"
+                max="1"
+                step="0.1"
+                value={config.temperature}
+                onChange={handleChange}
+                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+              />
+              <div className="flex justify-between text-xs text-gray-400 mt-1">
+                <span>Precise</span>
+                <span>Balanced</span>
+                <span>Creative</span>
               </div>
             </div>
 
@@ -283,7 +359,30 @@ const EditConfigPage = () => {
             {/* File Upload */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Knowledge Base Files</label>
-              <div className="mt-1 flex flex-col items-center justify-center px-6 pt-8 pb-8 border-2 border-dashed rounded-xl transition-all duration-200 cursor-pointer hover:border-indigo-500 bg-gray-800/50">
+              
+              {/* Display existing files */}
+              {config.documents && config.documents.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  
+                  <ul className="space-y-2">
+                    {config.documents.map((fileName) => (
+                      <li key={fileName} className="flex items-center justify-between bg-gray-700/50 p-2 rounded-md">
+                        <span className="text-sm text-gray-300">{fileName}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveFile(fileName)}
+                          className="text-red-400 hover:text-red-500"
+                        >
+                          <FaTrash className="text-sm" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* File upload area */}
+              <div className="mt-4 flex flex-col items-center justify-center px-6 pt-8 pb-8 border-2 border-dashed rounded-xl transition-all duration-200 cursor-pointer hover:border-indigo-500 bg-gray-800/50">
                 <div className="text-center">
                   <FaUpload className="mx-auto text-2xl mb-3 text-gray-500" />
                   <p className="text-sm text-gray-400">

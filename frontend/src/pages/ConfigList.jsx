@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import apiClient from '../api/apiClient';
-import { FaPlus, FaRobot, FaCog, FaSpinner } from 'react-icons/fa';
+import { FaCog, FaPlus, FaRobot, FaSpinner } from 'react-icons/fa';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+
 import UserInfo from '../components/UserInfo';
+import apiClient from '../api/apiClient';
 
 // Your perfect ConfigItem component remains exactly the same
 const ConfigItem = ({ config, onSelect, onEdit }) => {
@@ -98,7 +99,11 @@ const ConfigListPage = () => {
   };
 
   const onEdit = (config) => {
-    const configForEdit = { ...config, config_id: config._id };
+    const configForEdit = {
+      ...config,
+      _id: config._id,
+      documents: config.documents || [] // Ensure documents are included
+    };
     navigate(`/edit-config`, { state: { config: configForEdit } });
   };
 
@@ -121,7 +126,7 @@ const ConfigListPage = () => {
                   AI Assistants
                 </h1>
                 <p className="text-gray-400/90 text-sm">
-                  Manage your personalized AI configurations
+                  Manage your personalized AI Assistance configurations
                 </p>
               </div>
               <button className="flex items-center px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-indigo-500/20" onClick={handleCreateNew}>
@@ -178,7 +183,7 @@ const ConfigListPage = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {configs.map((config) => (
                     <ConfigItem
-                      key={config.config_id}
+                      key={config._id}
                       config={config}
                       onSelect={handleSelectConfig}
                       onEdit={onEdit}

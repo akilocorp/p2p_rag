@@ -11,7 +11,6 @@ auth_bp = Blueprint('auth_bp', __name__)
 bcrypt = Bcrypt()
 from models.user import User
 # --- API Routes for Authentication
-# 
 from app import mail
 
 # --- Helper Function to Send Email ---
@@ -54,7 +53,7 @@ def register():
         elif users_collection.find_by_username(username):
             return jsonify({"error": "That username already exists. Please choose a different one."}), 409
 
-        # Hash the password
+        # Hash password
         password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
         
         serializer = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])

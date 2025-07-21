@@ -91,6 +91,7 @@ def process_files_and_create_vector_store(temp_file_paths, user_id, collection_n
                 split.metadata['user_id'] = user_id
                 split.metadata['config_id'] = str(config_id) # Link chunk to the config
                 split.metadata['collection_name'] = collection_name
+                split.metadata['original_file'] = os.path.basename(temp_file_path)
 
             
             all_splits.extend(splits)
@@ -109,7 +110,7 @@ def process_files_and_create_vector_store(temp_file_paths, user_id, collection_n
             documents=all_splits,
             embedding=embeddings,
             collection=mongo_collection,
-            index_name="vector_index"
+            index_name="vector"
         )
         current_app.logger.info("Successfully inserted vectors into MongoDB Atlas.")
        

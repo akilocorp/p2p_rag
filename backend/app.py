@@ -20,6 +20,7 @@ from datetime import timedelta
 from routes.auth import auth_bp
 from routes.config_routes import config_bp
 from routes.chat_routes import chat_bp
+from routes.edit_config_routes import edit_config_bp
 from flask_mail import Mail
 
 mail = Mail()
@@ -97,6 +98,7 @@ def create_app():
     app.register_blueprint(chat_bp, url_prefix='/api')
     app.register_blueprint(auth_bp, url_prefix='/api/auth') 
     app.register_blueprint(config_bp, url_prefix='/api')
+    app.register_blueprint(edit_config_bp, url_prefix='/api')
 
     
     # A simple health check endpoint

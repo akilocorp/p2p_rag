@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom'; // Assuming you use React Router
+
 import apiClient from '../api/apiClient';
 
 const EmailVerificationPage = () => {
@@ -24,7 +25,7 @@ const EmailVerificationPage = () => {
         // API call to your backend to verify the token
         const response = await apiClient.post('/auth/verify-email', { token });
 
-        setMessage(response.data.message || 'Email verified successfully! You can now log in.');
+        setMessage(response.data.message || 'Email verified successfully! You can now Sign in.');
         setIsError(false);
 
         // Redirect to login page after a few seconds

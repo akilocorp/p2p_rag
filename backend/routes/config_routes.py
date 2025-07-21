@@ -21,80 +21,7 @@ def allowed_file(filename):
     """Checks if the uploaded file has an allowed extension."""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-@config_bp.route('/config/<string:config_id>', methods=['PUT'])
-@jwt_required()
-def update_config(config_id):
-    """
-    Updates a configuration, such as its public status.
-    Only the owner of the config can update it.
-    """
-    try:
-        user_id = get_jwt_identity()
-        data = request.get_json()
-        is_public = data.get('is_public')
 
-        if is_public is None or not isinstance(is_public, bool):
-            return jsonify({"error": "Missing or invalid 'is_public' field"}), 400
-
-        # Find the config ensuring it belongs to the authenticated user
-        config_to_update = Config.get_collection().find_one({
-            "_id": ObjectId(config_id),
-            "user_id": user_id
-        })
-
-        if not config_to_update:
-            return jsonify({"message": "Configuration not found or access denied"}), 404
-
-        # Update the document in the database
-        Config.get_collection().update_one(
-            {"_id": ObjectId(config_id)},
-            {"$set": {"is_public": is_public}}
-        )
-
-        return jsonify({"message": "Configuration updated successfully"}), 200
-
-    except Exception as e:
-        current_app.logger.error(f"Error updating config {config_id}: {e}", exc_info=True)
-        return jsonify({"error": "An internal server error occurred"}), 500
-
-@config_bp.route('/config/<string:config_id>', methods=['DELETE'])
-@jwt_required()
-def delete_config(config_id):
-    """
-    Deletes a configuration and its associated vector store collection.
-    Only the owner of the config can delete it.
-    """
-    try:
-        user_id = get_jwt_identity()
-        config_to_delete = Config.get_collection().find_one({
-            "_id": ObjectId(config_id),
-            "user_id": user_id
-        })
-
-        if not config_to_delete:
-            return jsonify({"message": "Configuration not found or access denied"}), 404
-
-        # Delete the configuration from MongoDB
-        Config.get_collection().delete_one({"_id": ObjectId(config_id)})
-
-        # Delete the associated vector store collection from ChromaDB
-        collection_name = config_to_delete.get('collection_name')
-        if collection_name:
-            try:
-                from src.utils.vector_stores.get_vector_store import get_vector_store
-                vector_store = get_vector_store(collection_name)
-                # This assumes the vector store client has a delete_collection method
-                vector_store._client.delete_collection(name=collection_name)
-                current_app.logger.info(f"Successfully deleted vector store collection: {collection_name}")
-            except Exception as e:
-                # Log if the collection deletion fails, but don't block the main deletion
-                current_app.logger.error(f"Failed to delete vector store collection '{collection_name}': {e}", exc_info=True)
-
-        return jsonify({"message": "Configuration deleted successfully"}), 200
-
-    except Exception as e:
-        current_app.logger.error(f"An error occurred in delete_config: {e}", exc_info=True)
-        return jsonify({"error": "An internal server error occurred"}), 500
 
 @config_bp.route('/config_list', methods=['GET'])
 @jwt_required()
@@ -116,8 +43,9 @@ def getconfigs():
         # 3. Serialize the documents for the JSON response
         configs_list = []
         for config in user_configs_cursor:
-            # Convert the MongoDB ObjectId to a string and rename it for clarity
             config['config_id'] = str(config.pop('_id'))
+            # Ensure 'collection_name' is present, defaulting to an empty string if not
+            config['collection_name'] = config.get('collection_name', '')
             configs_list.append(config)
         
         # 4. Return the list of configurations
@@ -160,7 +88,8 @@ def get_single_config(config_id):
 
         # 5. Serialize the document for the JSON response
         # Convert the ObjectId to a string so it's JSON serializable
-        config_document["_id"] = str(config_document["_id"])
+        config_document["config_id"] = str(config_document.pop("_id"))
+        config_document['collection_name'] = config_document.get('collection_name', '')
         return jsonify({"config": config_document}), 200
     except Exception as e:
         current_app.logger.error(f"Error fetching config {config_id} for user {user_id}: {e}", exc_info=True)
@@ -252,14 +181,18 @@ Answer:"""
         # --- 6. Save Configuration to MongoDB ---
         mongo_collection = Config
 
+        # Get the filenames of uploaded files
+        uploaded_filenames = [secure_filename(file.filename) for file in uploaded_files if file and allowed_file(file.filename)]
+        
         config_document = {
             "user_id": user_id,
             "bot_name": bot_name,
-            "collection": collection_name,
+            "collection_name": collection_name,
             "model_name": llm_type,
             "prompt_template": final_prompt_template, # Save the dynamically created template
             "temperature": temperature,
-            "is_public":is_public
+            "is_public": is_public,
+            "documents": uploaded_filenames  # Store the filenames of uploaded documents
         }
         
         result = mongo_collection.get_collection().insert_one(config_document)
@@ -268,12 +201,20 @@ Answer:"""
 
         # --- 7. Process Files (No change) ---
         if temp_file_paths:
+            # Use the provided collection name, or generate one if it's empty
+            final_collection_name = collection_name if collection_name else f"config_{config_id}"
             process_files_and_create_vector_store(
                 temp_file_paths=temp_file_paths, 
                 user_id=user_id, 
-                collection_name=collection_name,
+                collection_name=final_collection_name,
                 config_id=config_id
             )
+            # Update the config with the final collection name if it was generated
+            if not collection_name:
+                Config.get_collection().update_one(
+                    {"_id": config_id},
+                    {"$set": {"collection_name": final_collection_name}}
+                )
         
         return jsonify({
             "message": "Configuration saved successfully!",
