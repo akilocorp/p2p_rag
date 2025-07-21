@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import apiClient from '../api/apiClient';
-import { FaPlus, FaRobot, FaCog, FaSpinner } from 'react-icons/fa';
+import { FaCog, FaPlus, FaRobot, FaSpinner } from 'react-icons/fa';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+
 import UserInfo from '../components/UserInfo';
+import apiClient from '../api/apiClient';
 
 // Your perfect ConfigItem component remains exactly the same
 const ConfigItem = ({ config, onSelect, onEdit }) => {
@@ -125,7 +126,7 @@ const ConfigListPage = () => {
                   AI Assistants
                 </h1>
                 <p className="text-gray-400/90 text-sm">
-                  Manage your personalized AI configurations
+                  Manage your personalized AI Assistance configurations
                 </p>
               </div>
               <button className="flex items-center px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-indigo-500/20" onClick={handleCreateNew}>

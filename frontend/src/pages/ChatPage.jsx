@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { FiAlertTriangle, FiChevronRight, FiLoader, FiSend } from 'react-icons/fi';
+import React, { useEffect, useRef, useState } from 'react';
+import { RiRobot2Line, RiUser3Line } from 'react-icons/ri';
+import { useNavigate, useParams } from 'react-router-dom';
+
+import { ChatSidebar } from '../components/SideBar';
+import { FaSpinner } from 'react-icons/fa';
 import apiClient from '../api/apiClient';
 import { marked } from 'marked';
-import { FiSend, FiLoader, FiAlertTriangle, FiChevronRight } from 'react-icons/fi';
-import { RiRobot2Line, RiUser3Line } from 'react-icons/ri';
-import { FaSpinner } from 'react-icons/fa';
-import { ChatSidebar } from '../components/SideBar';
 
 const ChatMessage = ({ message }) => {
   const { sender, text, isTyping, sources } = message;
@@ -299,7 +300,7 @@ const ChatPage = () => {
                   </p>
                 </div>
                 <h2 className="text-2xl font-bold bg-gray-500 bg-clip-text text-transparent">
-                  How can I help you today?
+                  How can I help you today ?
                 </h2>
               </div>
             )}

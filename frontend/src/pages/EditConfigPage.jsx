@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { FaFile, FaInfoCircle, FaRobot, FaSave, FaTimes, FaTrash, FaUpload } from 'react-icons/fa';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+
 import apiClient from '../api/apiClient';
-import { FaRobot, FaUpload, FaTrash, FaInfoCircle, FaFile, FaSave, FaTimes } from 'react-icons/fa';
 
 const EditConfigPage = () => {
   const navigate = useNavigate();
@@ -104,7 +105,7 @@ const EditConfigPage = () => {
 
   const handleSubmit = async (e) => {
     console.log('Current config state:', config); // Debug log
-    console.log('ID in config:', config.config_id); // Debug log
+    console.log('ID in config:', config.config_id);
     e.preventDefault();
     setIsLoading(true);
     setErrors({});
