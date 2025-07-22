@@ -9,7 +9,11 @@ import apiClient from '../api/apiClient';
 import { marked } from 'marked';
 
 const ChatMessage = ({ message }) => {
+<<<<<<< HEAD
   const { sender, text, isTyping, sources } = message;
+=======
+  const { sender, text, isTyping } = message;
+>>>>>>> origin/master
   const isUser = sender === 'user';
 
   const createMarkup = (markdownText) => {
@@ -41,6 +45,10 @@ const ChatMessage = ({ message }) => {
             dangerouslySetInnerHTML={createMarkup(text)}
           />
         )}
+<<<<<<< HEAD
+=======
+      
+>>>>>>> origin/master
       </div>
       {isUser && (
         <div className="flex-shrink-0 w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center">
@@ -163,15 +171,23 @@ const ChatPage = () => {
     if (!input.trim() || isLoading || !configId) return;
 
     const userMessage = { sender: 'user', text: input };
+<<<<<<< HEAD
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
+=======
+    setMessages(prev => [...prev, userMessage, { sender: 'ai', isTyping: true }]);
+>>>>>>> origin/master
     setInput('');
     setIsLoading(true);
 
     try {
       const targetChatId = chatId || crypto.randomUUID();
 
+<<<<<<< HEAD
       setMessages(prev => [...prev, { sender: 'ai', isTyping: true }]);
+=======
+      
+>>>>>>> origin/master
 
       const response = await apiClient.post(`/chat/${configId}/${targetChatId}`, {
         input: userMessage.text,
@@ -180,6 +196,7 @@ const ChatPage = () => {
       if (!chatId) {
         navigate(`/chat/${configId}/${targetChatId}`, { replace: true });
       }
+<<<<<<< HEAD
 
       setMessages(prev => [
         ...prev,
@@ -194,6 +211,29 @@ const ChatPage = () => {
       setError("Failed to send message. Please try again.");
     } finally {
       setIsLoading(false);
+=======
+      const aiResponse = {
+            sender: 'ai',
+            text: response.data.response,
+            sources: response.data.sources || []
+        };
+
+     setMessages(prev => {
+            // Remove the last item (the typing indicator)
+            const updatedMessages = prev.slice(0, -1); 
+            // Add the final AI response
+            return [...updatedMessages, aiResponse];
+        });
+
+    } catch (error) {
+        console.error("Chat error:", error);
+        // On error, revert the optimistic updates (remove user message and typing indicator)
+        setMessages(prev => prev.slice(0, -2)); 
+        setInput(userMessage.text); // Put the user's text back in the input
+        setError("Failed to send message. Please try again.");
+    } finally {
+        setIsLoading(false);
+>>>>>>> origin/master
     }
   };
 
@@ -341,4 +381,8 @@ const ChatPage = () => {
   );
 };
 
+<<<<<<< HEAD
 export default ChatPage;
+=======
+export default ChatPage;
+>>>>>>> origin/master

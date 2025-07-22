@@ -18,16 +18,24 @@ RUN pip install --no-cache-dir -r requirements.txt \
 # Stage 2: Runtime Stage - Copy only what's needed for the final application
 # Use a fresh, clean base image for the final, smaller runtime image.
 # It's good practice to use the same base or an even smaller one like 'python:3.11-slim-buster'
-# if 'slim' is too large, but 'slim' is usually fine.
-# Copy the installed Python packages from the 'builder' stage to the final image.
-# This avoids re-running pip install in the final image
-# Copy the rest of your application source code.
-# This layer will be rebuilt only if your application code changes,
-# but the dependency layer (copied from 'builder') remains cached.
+# if 'slim' is too large, bu
+# Use an official Python runtime as a parent image
+FROM python:3.11-slim
+
+# Set the working directory in the container
+WORKDIR /app
+
+# Copy and install requirements
+COPY requirements.txt .
+RUN pip install --no-cache-dir --timeout=100 -r requirements.txt
+
+# Copy the rest of the application source code
 COPY . .
 
 # Expose the port the app runs on
 EXPOSE 5000
 
+# --- NEW COMMAND ---
 # Run the app directly using the python interpreter
-CMD ["python", "app.py"]
+CMD ["python", "app.py"] 
+

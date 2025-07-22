@@ -42,61 +42,80 @@ def get_chat_history(chat_id):
 @chat_bp.route('/chat/list/<string:config_id>', methods=['GET'])
 @jwt_required()
 def get_chat_list(config_id):
-    """Retrieves a list of all chat sessions, ensuring backward compatibility."""
     try:
         user_id = get_jwt_identity()
         db = current_app.config['MONGO_DB']
         metadata_collection = db["chat_session_metadata"]
-        message_collection = db["message_store"]
 
-        # Step 1: Find all unique session IDs from the message_store for this user.
-        # This ensures we find all chats, even old ones without metadata.
+        # This pipeline does all the heavy lifting in the database.
         pipeline = [
-            {'$match': {'History': {'$exists': True}}},
-            {'$project': {'SessionId': 1, 'History': 1, '_id': 1}},
-            {'$sort': {'_id': 1}},
-            {'$group': {
-                '_id': '$SessionId',
-                'first_message_doc': {'$first': '$$ROOT'}
-            }}
+            {
+                '$match': {
+                    '$or': [
+                        {'user_id': user_id},
+                        {'user_id': "anonymous"}
+                    ],
+                    'config_id': config_id
+                }
+            },
+            {'$sort': {'_id': -1}},
+            {
+                '$lookup': {
+                    'from': 'message_store',
+                    'let': {'session_id_str': '$session_id'},
+                    'pipeline': [
+                        {'$match': {'$expr': {'$eq': ['$SessionId', '$$session_id_str']}}},
+                        {'$sort': {'_id': 1}},
+                        {'$limit': 1},
+                        {'$project': {'History': 1, '_id': 0}}
+                    ],
+                    'as': 'first_message_info'
+                }
+            },
+            {
+                '$project': {
+                    '_id': 1, # Keep _id for timestamp and updates
+                    'session_id': '$session_id',
+                    'user_id': '$user_id',
+                    'timestamp': {'$dateToString': {'format': '%Y-%m-%dT%H:%M:%S.%LZ', 'date': '$_id'}},
+                    'first_message_history': {'$arrayElemAt': ['$first_message_info.History', 0]}
+                }
+            }
         ]
-        all_sessions = list(message_collection.aggregate(pipeline))
 
-        # Step 2: For each session, ensure metadata exists and fetch title.
+        # 1. Execute the single, efficient pipeline
+        sessions_from_db = list(metadata_collection.aggregate(pipeline))
+        
         sessions_list = []
-        for session_group in all_sessions:
-            session_id = session_group['_id']
-            if not session_id:
-                continue
+        # 2. Loop through the results just to create the title and claim anonymous chats
+        for session in sessions_from_db:
+            
+            # If the chat is anonymous, claim it for the current user
+            if session.get('user_id') == 'anonymous':
+                 metadata_collection.update_one(
+                    {"_id": session["_id"]}, # Use the _id we kept in the pipeline
+                    {"$set": {"user_id": user_id}}
+                )
+                 print(f"✅ Claimed anonymous chat {session['session_id']} for user {user_id}")
 
-            # Ensure metadata exists, creating it if it's missing (for old chats).
-            metadata_doc = metadata_collection.find_one_and_update(
-                {"session_id": session_id},
-                {"$setOnInsert": {"user_id": user_id, "config_id": config_id, "session_id": session_id}},
-                upsert=True,
-                return_document=True
-            )
 
-            # Step 3: Only include sessions that belong to the current user and config.
-            if metadata_doc.get('user_id') == user_id and metadata_doc.get('config_id') == config_id:
-                title = "New Chat"
-                first_message_doc = session_group['first_message_doc']
-                try:
-                    history_data = json.loads(first_message_doc["History"])
+            title = "New Chat"
+            try:
+                # Use the correct field name from the pipeline: 'first_message_history'
+                if session.get('first_message_history'):
+                    history_data = json.loads(session['first_message_history'])
                     if history_data.get("data", {}).get("content"):
                         title = history_data["data"]["content"]
-                except (json.JSONDecodeError, TypeError):
-                    pass # Ignore malformed history
+            except (json.JSONDecodeError, TypeError):
+                pass  # Ignore malformed history
 
-                sessions_list.append({
-                    'session_id': session_id,
-                    'title': title[:100],
-                    'timestamp': metadata_doc['_id'].generation_time.isoformat()
-                })
-        
-        # Sort sessions by timestamp descending
-        sessions_list.sort(key=lambda s: s['timestamp'], reverse=True)
+            sessions_list.append({
+                'session_id': session['session_id'],
+                'title': title[:100],
+                'timestamp': session['timestamp']
+            })
 
+        # 3. The return statement is OUTSIDE and AFTER the loop
         return jsonify({"sessions": sessions_list}), 200
     except Exception as e:
         logger.error(f"Error fetching chat list for config {config_id}: {e}", exc_info=True)
