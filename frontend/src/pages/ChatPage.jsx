@@ -41,17 +41,6 @@ const ChatMessage = ({ message }) => {
             dangerouslySetInnerHTML={createMarkup(text)}
           />
         )}
-        {sources && sources.length > 0 && (
-          <div className="mt-3 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm">
-            <h4 className="text-gray-700 dark:text-gray-300 mb-2 font-medium">Sources:</h4>
-            {sources.map((source, idx) => (
-              <div key={idx} className="mb-3 pb-3 border-b border-gray-200 dark:border-gray-700 last:border-0">
-                <div><strong className="text-gray-600 dark:text-gray-400">Document:</strong> {source.source}</div>
-                <div className="text-gray-500 dark:text-gray-400 mt-1">{source.page_content}</div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
       {isUser && (
         <div className="flex-shrink-0 w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center">
