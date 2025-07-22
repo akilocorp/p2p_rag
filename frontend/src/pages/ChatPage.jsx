@@ -9,7 +9,7 @@ import apiClient from '../api/apiClient';
 import { marked } from 'marked';
 
 const ChatMessage = ({ message }) => {
-  const { sender, text, isTyping, sources } = message;
+  const { sender, text, isTyping } = message;
   const isUser = sender === 'user';
 
   const createMarkup = (markdownText) => {
@@ -41,17 +41,7 @@ const ChatMessage = ({ message }) => {
             dangerouslySetInnerHTML={createMarkup(text)}
           />
         )}
-        {sources && sources.length > 0 && (
-          <div className="mt-3 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm">
-            <h4 className="text-gray-700 dark:text-gray-300 mb-2 font-medium">Sources:</h4>
-            {sources.map((source, idx) => (
-              <div key={idx} className="mb-3 pb-3 border-b border-gray-200 dark:border-gray-700 last:border-0">
-                <div><strong className="text-gray-600 dark:text-gray-400">Document:</strong> {source.source}</div>
-                <div className="text-gray-500 dark:text-gray-400 mt-1">{source.page_content}</div>
-              </div>
-            ))}
-          </div>
-        )}
+      
       </div>
       {isUser && (
         <div className="flex-shrink-0 w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center">
@@ -174,15 +164,14 @@ const ChatPage = () => {
     if (!input.trim() || isLoading || !configId) return;
 
     const userMessage = { sender: 'user', text: input };
-    const newMessages = [...messages, userMessage];
-    setMessages(newMessages);
+    setMessages(prev => [...prev, userMessage, { sender: 'ai', isTyping: true }]);
     setInput('');
     setIsLoading(true);
 
     try {
       const targetChatId = chatId || crypto.randomUUID();
 
-      setMessages(prev => [...prev, { sender: 'ai', isTyping: true }]);
+      
 
       const response = await apiClient.post(`/chat/${configId}/${targetChatId}`, {
         input: userMessage.text,
@@ -191,20 +180,27 @@ const ChatPage = () => {
       if (!chatId) {
         navigate(`/chat/${configId}/${targetChatId}`, { replace: true });
       }
+      const aiResponse = {
+            sender: 'ai',
+            text: response.data.response,
+            sources: response.data.sources || []
+        };
 
-      setMessages(prev => [
-        ...prev,
-        { sender: 'user', text: userMessage.text, sources: [] },
-        { sender: 'ai', text: response.data.response, sources: response.data.sources || [] }
-      ]);
+     setMessages(prev => {
+            // Remove the last item (the typing indicator)
+            const updatedMessages = prev.slice(0, -1); 
+            // Add the final AI response
+            return [...updatedMessages, aiResponse];
+        });
 
     } catch (error) {
-      console.error("Chat error:", error);
-      setMessages(messages);
-      setInput(userMessage.text);
-      setError("Failed to send message. Please try again.");
+        console.error("Chat error:", error);
+        // On error, revert the optimistic updates (remove user message and typing indicator)
+        setMessages(prev => prev.slice(0, -2)); 
+        setInput(userMessage.text); // Put the user's text back in the input
+        setError("Failed to send message. Please try again.");
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
   };
 
