@@ -2,9 +2,9 @@ name: Deploy to EC2
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
 
 env:
   AWS_REGION: us-east-2
@@ -68,7 +68,7 @@ jobs:
           }
           
           # Pull latest changes
-          git pull origin main || git pull origin master
+          git pull origin main
           
           # Configure AWS CLI (if not already configured)
           aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
