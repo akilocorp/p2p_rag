@@ -59,6 +59,7 @@ def get_chat_list(config_id):
                 }
             },
             {'$sort': {'_id': -1}},
+            //
             {
                 '$lookup': {
                     'from': 'message_store',

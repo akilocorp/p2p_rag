@@ -61,9 +61,14 @@ jobs:
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
           # Navigate to application directory
+           # Add GitHub's key to known_hosts to prevent host key verification failure
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+          # Navigate to application directory
           cd /home/${{ secrets.EC2_USER }}/rag_platform || {
             echo "Application directory not found. Creating and cloning repository..."
-            git clone https://github.com/${{ github.repository }}.git /home/${{ secrets.EC2_USER }}/rag_platform
+            # ✅ FIX: Use the SSH URL for cloning
+            git clone git@github.com:${{ github.repository }}.git /home/${{ secrets.EC2_USER }}/rag_platform
             cd /home/${{ secrets.EC2_USER }}/rag_platform
           }
           
@@ -75,18 +80,18 @@ jobs:
           aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws configure set default.region ${{ env.AWS_REGION }}
           
-          # Login to ECR
-          aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }}
+          # ✅ FIX: Login to ECR using sudo
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | sudo docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }}
           
-          # Pull latest images
-          docker pull ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_BACKEND }}:latest
-          docker pull ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_FRONTEND }}:latest
+          # ✅ FIX: Pull latest images using sudo
+          sudo docker pull ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_BACKEND }}:latest
+          sudo docker pull ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_FRONTEND }}:latest
           
-          # Stop existing containers
-          docker-compose -f docker-compose.prod.yml down || true
+          # ✅ FIX: Stop existing containers using sudo
+          sudo docker-compose -f docker-compose.prod.yml down || true
           
-          # Start new containers
-          docker-compose -f docker-compose.prod.yml up -d
+          # ✅ FIX: Start new containers using sudo
+          sudo docker-compose -f docker-compose.prod.yml up -d
           
-          # Clean up old images
-          docker image prune -f
+          # ✅ FIX: Clean up old images using sudo
+          sudo docker image prune -f
