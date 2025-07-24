@@ -82,16 +82,27 @@ jobs:
           docker pull ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_BACKEND }}:latest
           docker pull ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_FRONTEND }}:latest
           
-          # Force stop and remove existing containers
-          docker stop rag_platform_frontend_prod rag_platform_backend_prod 2>/dev/null || true
-          docker rm rag_platform_frontend_prod rag_platform_backend_prod 2>/dev/null || true
+          # Nuclear cleanup - force remove everything
+          echo "Starting aggressive cleanup..."
+          
+          # Kill containers forcefully by ID (these specific containers are stuck)
+          docker kill 027072f924febb04b90c30508d4b7590d7635dc086e8873f0eb0d096f076ec72 2>/dev/null || true
+          docker kill 7c4b0d9d2d0ab9abeae4c913ca1efd0b37ecd45472609548d61850fcd32178ce 2>/dev/null || true
+          docker rm -f 027072f924febb04b90c30508d4b7590d7635dc086e8873f0eb0d096f076ec72 2>/dev/null || true
+          docker rm -f 7c4b0d9d2d0ab9abeae4c913ca1efd0b37ecd45472609548d61850fcd32178ce 2>/dev/null || true
+          
+          # Kill containers by name
+          docker kill rag_platform_frontend_prod rag_platform_backend_prod 2>/dev/null || true
+          docker rm -f rag_platform_frontend_prod rag_platform_backend_prod 2>/dev/null || true
+          
+          # Remove network forcefully
           docker network rm rag_network 2>/dev/null || true
           
-          # Clean stop with docker-compose
-          docker-compose -f docker-compose.prod.yml down --remove-orphans || true
+          # Clean up any remaining containers with our app name
+          docker ps -a --filter "name=rag_platform" -q | xargs -r docker rm -f 2>/dev/null || true
+          
+          # Prune everything
+          docker system prune -f 2>/dev/null || true
           
           # Start new containers
           docker-compose -f docker-compose.prod.yml up -d
-          
-          # Clean up old images
-          docker image prune -f
