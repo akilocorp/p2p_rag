@@ -14,7 +14,7 @@ const ChatMessage = ({ message }) => {
   const isUser = sender === 'user';
 
   const createMarkup = (markdownText) => {
-    //check
+    //check_now
     const rawMarkup = marked.parse(markdownText || '');
     return { __html: rawMarkup };
   };
