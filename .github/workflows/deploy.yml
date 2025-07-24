@@ -102,16 +102,17 @@ jobs:
           # Stop existing containers and clean up
           docker-compose -f docker-compose.prod.yml down || true
           
-          # Check if port 80 is in use and set alternative port if needed
-          if ss -tuln | grep -q ':80 ' || lsof -i :80 >/dev/null 2>&1; then
-            echo "Port 80 is in use, using port 8080 for frontend"
-            export FRONTEND_PORT=8080
-            export FRONTEND_HTTPS_PORT=8443
-          else
-            echo "Port 80 is available, using default ports"
-            export FRONTEND_PORT=80
-            export FRONTEND_HTTPS_PORT=443
-          fi
+          # Stop any service using port 80 (like Apache/Nginx)
+          sudo systemctl stop apache2 2>/dev/null || true
+          sudo systemctl stop nginx 2>/dev/null || true
+          sudo systemctl stop httpd 2>/dev/null || true
+          
+          # Kill any remaining processes on port 80
+          sudo fuser -k 80/tcp 2>/dev/null || true
+          sudo fuser -k 443/tcp 2>/dev/null || true
+          
+          # Wait for ports to be released
+          sleep 3
           
           # Start new containers
           docker-compose -f docker-compose.prod.yml up -d
@@ -136,7 +137,7 @@ jobs:
           # Show deployment information
           echo "=== DEPLOYMENT COMPLETE ==="
           echo "Backend URL: http://$(curl -s http://checkip.amazonaws.com):5000"
-          echo "Frontend URL: http://$(curl -s http://checkip.amazonaws.com):${FRONTEND_PORT:-8080}"
+          echo "Frontend URL: http://$(curl -s http://checkip.amazonaws.com)"
           echo "Container Status:"
           docker-compose -f docker-compose.prod.yml ps
           
