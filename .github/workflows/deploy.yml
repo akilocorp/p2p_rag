@@ -99,47 +99,11 @@ jobs:
           docker pull ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_BACKEND }}:latest
           docker pull ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_FRONTEND }}:latest
           
-          # Stop existing containers and clean up
+          # Stop existing containers
           docker-compose -f docker-compose.prod.yml down || true
-          
-          # Stop any service using port 80 (like Apache/Nginx)
-          sudo systemctl stop apache2 2>/dev/null || true
-          sudo systemctl stop nginx 2>/dev/null || true
-          sudo systemctl stop httpd 2>/dev/null || true
-          
-          # Kill any remaining processes on port 80
-          sudo fuser -k 80/tcp 2>/dev/null || true
-          sudo fuser -k 443/tcp 2>/dev/null || true
-          
-          # Wait for ports to be released
-          sleep 3
           
           # Start new containers
           docker-compose -f docker-compose.prod.yml up -d
-          
-          # Wait for containers to start
-          sleep 10
-          
-          # Check container status
-          docker-compose -f docker-compose.prod.yml ps
-          
-          # Check for any failed containers and show logs
-          if docker-compose -f docker-compose.prod.yml ps | grep -q 'Exit'; then
-            echo "=== CONTAINER FAILURE DETECTED ==="
-            echo "Frontend container logs:"
-            docker-compose -f docker-compose.prod.yml logs frontend || true
-            echo "Attempting to restart frontend container..."
-            docker-compose -f docker-compose.prod.yml restart frontend || true
-            sleep 5
-            docker-compose -f docker-compose.prod.yml ps
-          fi
-          
-          # Show deployment information
-          echo "=== DEPLOYMENT COMPLETE ==="
-          echo "Backend URL: http://$(curl -s http://checkip.amazonaws.com):5000"
-          echo "Frontend URL: http://$(curl -s http://checkip.amazonaws.com)"
-          echo "Container Status:"
-          docker-compose -f docker-compose.prod.yml ps
           
           # Clean up old images
           docker image prune -f
