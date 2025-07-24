@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { RiRobot2Line, RiUser3Line } from 'react-icons/ri';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { ChatSidebar } from '../components/SideBar';
+import ChatSidebar  from '../components/SideBar.jsx';
 import { FaSpinner } from 'react-icons/fa';
 import apiClient from '../api/apiClient';
 import { marked } from 'marked';

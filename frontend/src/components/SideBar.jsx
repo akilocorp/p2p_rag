@@ -328,3 +328,6 @@ export const ChatSidebar = ({
     </aside>
   );
 };
+
+export default ChatSidebar;
+
