@@ -103,7 +103,7 @@ jobs:
           docker-compose -f docker-compose.prod.yml down || true
           
           # Check if port 80 is in use and set alternative port if needed
-          if netstat -tuln | grep -q ':80 '; then
+          if ss -tuln | grep -q ':80 ' || lsof -i :80 >/dev/null 2>&1; then
             echo "Port 80 is in use, using port 8080 for frontend"
             export FRONTEND_PORT=8080
             export FRONTEND_HTTPS_PORT=8443
@@ -122,12 +122,23 @@ jobs:
           # Check container status
           docker-compose -f docker-compose.prod.yml ps
           
+          # Check for any failed containers and show logs
+          if docker-compose -f docker-compose.prod.yml ps | grep -q 'Exit'; then
+            echo "=== CONTAINER FAILURE DETECTED ==="
+            echo "Frontend container logs:"
+            docker-compose -f docker-compose.prod.yml logs frontend || true
+            echo "Attempting to restart frontend container..."
+            docker-compose -f docker-compose.prod.yml restart frontend || true
+            sleep 5
+            docker-compose -f docker-compose.prod.yml ps
+          fi
+          
           # Show deployment information
           echo "=== DEPLOYMENT COMPLETE ==="
           echo "Backend URL: http://$(curl -s http://checkip.amazonaws.com):5000"
           echo "Frontend URL: http://$(curl -s http://checkip.amazonaws.com):${FRONTEND_PORT:-8080}"
           echo "Container Status:"
-          docker-compose -f docker-compose.prod.yml ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
+          docker-compose -f docker-compose.prod.yml ps
           
           # Clean up old images
           docker image prune -f
