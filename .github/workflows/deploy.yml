@@ -82,11 +82,16 @@ jobs:
           docker pull ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_BACKEND }}:latest
           docker pull ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_FRONTEND }}:latest
           
-          # Stop existing containers
-          docker-compose -f docker-compose.prod.yml down || true
+          # Force stop and remove existing containers
+          docker stop rag_platform_frontend_prod rag_platform_backend_prod 2>/dev/null || true
+          docker rm rag_platform_frontend_prod rag_platform_backend_prod 2>/dev/null || true
+          docker network rm rag_network 2>/dev/null || true
+          
+          # Clean stop with docker-compose
+          docker-compose -f docker-compose.prod.yml down --remove-orphans || true
           
           # Start new containers
           docker-compose -f docker-compose.prod.yml up -d
           
           # Clean up old images
-          docker image prune -f  
+          docker image prune -f
