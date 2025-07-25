@@ -26,7 +26,8 @@ export const ChatSidebar = ({
   isCollapsed, 
   onClose, 
   onToggle,
-  onNewChat 
+  onNewChat,
+  isPublic
 }) => {
   const { chatId: activeChatId } = useParams();
   const navigate = useNavigate();
@@ -309,14 +310,27 @@ export const ChatSidebar = ({
                   </button>
                 )}
               </div>
+            ) : isPublic ? (
+              <div className={`flex flex-col items-center ${isCollapsed ? 'justify-center' : ''} py-3`}>
+                <div className="w-8 h-8 rounded-full bg-gray-500/10 flex items-center justify-center">
+                  <RiRobot2Line className="text-gray-400" />
+                </div>
+                {!isCollapsed && (
+                  <div className="text-center mt-2">
+                    <p className="text-sm font-medium text-gray-300">Public Chat</p>
+                    <p className="text-xs text-gray-500">Viewing as a guest</p>
+                   
+                  </div>
+                )}
+              </div>
             ) : (
-              <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-3 px-2'} py-3 rounded-lg hover:bg-gray-700/30 cursor-pointer transition-colors`}>
+              <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-3 px-2'} py-3 rounded-lg`}>
                 <div className="w-8 h-8 rounded-full bg-gray-500/10 flex items-center justify-center">
                   <FiUser className="text-gray-400" />
                 </div>
                 {!isCollapsed && (
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-400 truncate"> User</p>
+                    <p className="text-sm font-medium text-gray-400 truncate">User</p>
                     <p className="text-xs text-gray-500 truncate">Not logged in</p>
                   </div>
                 )}

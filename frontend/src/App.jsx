@@ -15,7 +15,8 @@ import SideBar from './components/SideBar'; // Import the SideBar component
 import EditConfigPage from './pages/EditConfigPage';
 
 // Import the ProtectedRoute component
-import ProtectedRoute from './components/ProtectedRoute'; 
+import ProtectedRoute from './components/ProtectedRoute';
+import PublicChatRoute from './components/PublicChatRoute'; 
 
 function App() {
   // You might manage authentication state here or in a context
@@ -29,7 +30,9 @@ function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/verify-email" element={<EmailVerificationPage />} />
-          <Route path="/chat/:configId/:chatId?" element={<ChatPage />} />
+          <Route element={<PublicChatRoute />}>
+            <Route path="/chat/:configId/:chatId?" element={<ChatPage />} />
+          </Route>
           {/* Protected Routes - Requires authentication */}
           <Route element={<ProtectedRoute />}>
             {/* Root route - Config List */}
