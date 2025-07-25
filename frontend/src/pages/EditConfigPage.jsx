@@ -259,6 +259,29 @@ const EditConfigPage = () => {
               {errors.model_name && <p className="mt-1 text-sm text-red-400">{errors.model_name}</p>}
             </div>
 
+            {/* Public Access Toggle */}
+            <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg">
+              <div>
+                <label htmlFor="is_public" className="block text-sm font-medium text-gray-300 mb-1">
+                  Public Access
+                </label>
+                <p className="text-xs text-gray-400 max-w-xs">
+                  Allow anyone with the link to chat without logging in.
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  id="is_public"
+                  name="is_public"
+                  className="sr-only peer"
+                  checked={config.is_public}
+                  onChange={handleChange}
+                />
+                <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-focus:ring-2 peer-focus:ring-indigo-500 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+
             {/* Temperature */}
             <div>
               <label htmlFor="temperature" className="block text-sm font-medium text-gray-300 mb-2">
@@ -385,7 +408,7 @@ const EditConfigPage = () => {
               <div className="mt-4 flex flex-col items-center justify-center px-6 pt-8 pb-8 border-2 border-dashed rounded-xl transition-all duration-200 cursor-pointer hover:border-indigo-500 bg-gray-800/50">
                 <div className="text-center">
                   <FaUpload className="mx-auto text-2xl mb-3 text-gray-500" />
-                  <p className="text-sm text-gray-400">
+                  <p className="text-xs text-gray-400">
                     Drag & drop files or click to browse
                   </p>
                   <p className="text-xs text-gray-500 mt-1">Supports: TXT, PDF, DOCX, MD (Max 10MB each)</p>
