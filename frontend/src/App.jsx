@@ -29,7 +29,7 @@ function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/verify-email" element={<EmailVerificationPage />} />
-
+          <Route path="/chat/:configId/:chatId?" element={<ChatPage />} />
           {/* Protected Routes - Requires authentication */}
           <Route element={<ProtectedRoute />}>
             {/* Root route - Config List */}
@@ -46,7 +46,7 @@ function App() {
             <Route path="/config" element={<ConfigPage />} />
             <Route path="/edit-config" element={<EditConfigPage />} />
             <Route path="/config_list" element={<ConfigList />} />
-            <Route path="/chat/:configId/:chatId?" element={<ChatPage />} />
+
           </Route>
         </Routes>
       </div>
