@@ -76,12 +76,25 @@ def get_single_config(config_id):
         config_document = Config.get_collection().find_one({"_id":ObjectId(config_id)})
         logger.info(f"config {config_document}",exc_info=True)
         if config_document is None:
-            return jsonify({"message": "Configuration not found or access denied"}), 404
-        if config_document["is_public"]==False:
-            verify_jwt_in_request() # This will raise an error if no valid JWT is present
+            return jsonify({"message": "Configuration not found"}), 404
+
+        # If the chat is public, return it immediately
+        if config_document.get("is_public") is True:
+            config_document["config_id"] = str(config_document.pop("_id"))
+            config_document['collection_name'] = config_document.get('collection_name', '')
+            return jsonify({"config": config_document}), 200
+
+        # If we're here, the chat is private, so a valid JWT is required
+        try:
+            verify_jwt_in_request()
             user_id = get_jwt_identity()
-            if config_document["user_id"] != user_id:
-                return jsonify({"message": "Access denied"}), 403
+        except Exception as e:
+            logger.warning(f"JWT verification failed for config {config_id}: {e}")
+            return jsonify({"message": "Authentication required for this private chat"}), 401
+
+        # Check if the authenticated user is the owner of the config
+        if config_document.get("user_id") != user_id:
+            return jsonify({"message": "Access denied. You are not the owner of this configuration."}), 403
 
         # 4. Check if a configuration was found
         

@@ -6,6 +6,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import ChatSidebar  from '../components/SideBar.jsx';
 import { FaSpinner } from 'react-icons/fa';
 import apiClient from '../api/apiClient';
+import axios from 'axios';
 import { marked } from 'marked';
 
 const ChatMessage = ({ message }) => {
@@ -71,6 +72,7 @@ const ChatPage = () => {
   const [isInitializing, setIsInitializing] = useState(true);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const isAuthenticated = !!localStorage.getItem('jwtToken');
 
   const handleNewChat = () => {
     setIsInitializing(true);
@@ -89,7 +91,25 @@ const ChatPage = () => {
       }
 
       try {
-        const response = await apiClient.get(`/config/${configId}`);
+        let response;
+        
+        // If user is authenticated, try with authentication first (for private chats)
+        if (isAuthenticated) {
+          try {
+            response = await apiClient.get(`/config/${configId}`);
+          } catch (authError) {
+            // If authenticated request fails, try without auth (might be a public chat)
+            if (authError.response?.status === 401 || authError.response?.status === 403) {
+              response = await axios.get(`/api/config/${configId}`);
+            } else {
+              throw authError;
+            }
+          }
+        } else {
+          // If user is not authenticated, use direct axios call
+          response = await axios.get(`/api/config/${configId}`);
+        }
+        
         setConfig(response.data.config);
       } catch (error) {
         console.error("Failed to fetch config:", error);
@@ -125,6 +145,12 @@ const ChatPage = () => {
   }, [chatId]);
 
   useEffect(() => {
+    // Only fetch sessions if user is authenticated
+    if (!isAuthenticated) {
+      setSessionsLoading(false);
+      return;
+    }
+
     const fetchSessions = async () => {
       if (!configId) return;
       setSessionsLoading(true);
@@ -138,9 +164,15 @@ const ChatPage = () => {
       }
     };
     fetchSessions();
-  }, [configId, messages]);
+  }, [configId, messages, isAuthenticated]);
 
   useEffect(() => {
+    // Only fetch user info if user is authenticated
+    if (!isAuthenticated) {
+      setUserInfoLoaded(true);
+      return;
+    }
+
     const fetchUserInfo = async () => {
       try {
         const response = await apiClient.get('/auth/me');
@@ -152,7 +184,7 @@ const ChatPage = () => {
       }
     };
     fetchUserInfo();
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -239,6 +271,7 @@ const ChatPage = () => {
           onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           onClose={() => setShowSidebar(false)}
           onNewChat={handleNewChat}
+          isPublic={config?.is_public}
         />
       </div>
 
