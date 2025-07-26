@@ -260,7 +260,9 @@ const ChatPage = () => {
   return (
     <div className="flex h-screen overflow-hidden bg-gray-900">
       {/* Sidebar */}
+     {isAuthenticated && (
       <div className="hidden md:block">
+        
         <ChatSidebar 
           sessions={sessions} 
           sessionsLoading={sessionsLoading}
@@ -273,10 +275,12 @@ const ChatPage = () => {
           onNewChat={handleNewChat}
           isPublic={config?.is_public}
         />
+	
       </div>
+     )}
 
       {/* Mobile sidebar overlay */}
-      {showSidebar && (
+      {showSidebar && isAuthenticated && (
         <div className="fixed inset-0 z-40 bg-black/40 md:hidden">
           <div className="absolute left-0 top-0 h-full">
             <ChatSidebar 
@@ -295,7 +299,7 @@ const ChatPage = () => {
 
       {/* Main content with loading overlay */}
       <div className={`relative flex-1 flex flex-col w-full transition-all duration-300 ${
-        isSidebarCollapsed ? 'md:ml-20' : 'md:ml-72'
+        isAuthenticated && !isSidebarCollapsed ? 'md:ml-72' : 'md:ml-0'
       }`}>
         {/* Loading overlay - positioned within chat area */}
         {isInitializing && (
@@ -323,13 +327,14 @@ const ChatPage = () => {
             {messages.length === 0 && !isLoading && !isInitializing && (
               <div className="flex flex-col items-center justify-center h-full text-center px-4 py-16 sm:py-20">
                 <div className="mb-6 flex flex-col items-center">
-                  <RiRobot2Line className="text-6xl text-indigo-500 mb-3 animate-bounce" />
                   <h2 className='text-3xl font-bold bg-gradient-to-r from-indigo-400 to-purple-500 bg-clip-text text-transparent'>
-                    Hey! I'm {config?.bot_name || 'AI Assistant'}
+                    Hey! I'm {config?.bot_name || ''}
                   </h2>
+		{isAuthenticated && (
                   <p className="text-xs text-gray-400 mt-1 bg-gray-800 px-2 py-1 rounded-full">
                     {config?.model_name || 'AI Model'}
                   </p>
+		)}
                 </div>
                 <h2 className="text-2xl font-bold bg-gray-500 bg-clip-text text-transparent">
                   How can I help you today ?
@@ -374,9 +379,11 @@ const ChatPage = () => {
                 {isLoading ? <FiLoader className="animate-spin" /> : <FiSend />}
               </button>
             </div>
+	{isAuthenticated && (
             <p className="text-xs text-gray-500 mt-2 text-center">
               {config?.is_public ? 'Public chat' : 'Private chat'} • Powered by {config?.model_name || 'AI'}
             </p>
+)}
           </div>
         </footer>
       </div>
