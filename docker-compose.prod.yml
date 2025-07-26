@@ -1,7 +1,7 @@
 # This version of the docker-compose.yml file is for PRODUCTION DEPLOYMENT.
 # It uses pre-built images from ECR instead of building locally.
 # Use this on your EC2 instance for production deployment.
-
+# ..
 services:
   backend:
     image: 235639741719.dkr.ecr.us-east-2.amazonaws.com/my-chat-app/backend:latest
