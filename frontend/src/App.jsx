@@ -42,7 +42,7 @@ function App() {
                 </div>
               </div>
             } />
-            {/* Protected routes */}
+            {}
             <Route path="/config" element={<ConfigPage />} />
             <Route path="/edit-config" element={<EditConfigPage />} />
             <Route path="/config_list" element={<ConfigList />} />
