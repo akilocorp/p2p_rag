@@ -153,7 +153,7 @@ const LoginPage = () => {
                         className={`flex-1 rounded-full ${
                           getPasswordStrength(password) === 'strong' && i <= 2 ? 'bg-green-500' :
                           getPasswordStrength(password) === 'medium' && i <= 1 ? 'bg-yellow-500' :
-                          getPasswordStrength(password) === 'weak' && i === 0 ? 'bg-red-500' : 'bg-gray-600'
+                          getPasswordStrength(password) === 'weak' && i === 0 ? 'bg-red-600' : 'bg-gray-600'
                         }`}
                       />
                     ))}
