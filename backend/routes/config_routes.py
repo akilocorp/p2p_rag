@@ -200,7 +200,7 @@ Answer:"""
         config_document = {
             "user_id": user_id,
             "bot_name": bot_name,
-            "collection_name": collection_name,
+            "collection_name": "hnsw",
             "model_name": llm_type,
             "prompt_template": final_prompt_template, # Save the dynamically created template
             "temperature": temperature,
@@ -214,20 +214,12 @@ Answer:"""
 
         # --- 7. Process Files (No change) ---
         if temp_file_paths:
-            # Use the provided collection name, or generate one if it's empty
-            final_collection_name = collection_name if collection_name else f"config_{config_id}"
             process_files_and_create_vector_store(
                 temp_file_paths=temp_file_paths, 
                 user_id=user_id, 
-                collection_name=final_collection_name,
+                collection_name="hnsw",
                 config_id=config_id
             )
-            # Update the config with the final collection name if it was generated
-            if not collection_name:
-                Config.get_collection().update_one(
-                    {"_id": config_id},
-                    {"$set": {"collection_name": final_collection_name}}
-                )
         
         return jsonify({
             "message": "Configuration saved successfully!",

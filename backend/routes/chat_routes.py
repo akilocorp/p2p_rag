@@ -3,6 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_req
 import logging
 import re
 import json
+import time
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
@@ -188,30 +189,52 @@ def chat(config_id, chat_id):
                 return jsonify(message="Authorization error: " + str(e)), 401
         
         db = current_app.config['MONGO_DB']
+        collection_name = config_document.get("collection_name")
+        if not collection_name:
+            logger.error(f"❌ Configuration {config_id} is missing the 'collection_name' field.")
+            return jsonify({"message": "Configuration is missing collection name."}), 400
+
         vector_store = MongoDBAtlasVectorSearch(
-            collection=db['vector_collection'],
+            collection=db[collection_name],
             embedding=current_app.config['EMBEDDINGS'],
-            index_name="vector"
+            index_name="hnsw_index",
+            text_key="text",
+            embedding_key="embedding"
         )
         
-        # Create a custom retriever function that includes filtering
+        # Log vector store initialization
+        logger.info(f"📊 Initialized HNSW vector store: collection='{collection_name}', index='hnsw_index'")
+        
+        # Create optimized retriever with clean logging
         def filtered_retriever(query):
+            """Perform HNSW vector search with config-based filtering."""
+            import time
+            start_time = time.time()
+            
             try:
-                # Use similarity search with filter
+                # Perform filtered vector search
                 docs = vector_store.similarity_search(
                     query=query,
                     k=3,
                     pre_filter={"config_id": {"$eq": config_id}}
                 )
-                logger.info(f"🔍 Vector search found {len(docs)} documents for config_id: {config_id}")
+                
+                search_time = time.time() - start_time
+                
+                # Log search results
                 if docs:
-                    logger.info(f"📄 First document preview: {docs[0].page_content[:200]}...")
-                    logger.info(f"📋 Document metadata: {docs[0].metadata}")
+                    logger.info(f"✅ Found {len(docs)} relevant documents in {search_time:.3f}s")
+                    # Log first result preview for context verification
+                    preview = docs[0].page_content[:100].replace('\n', ' ')
+                    logger.info(f"📄 Top result: {preview}...")
                 else:
-                    logger.warning(f"⚠️ No documents found in vector store for config_id: {config_id}")
+                    logger.warning(f"⚠️ No documents found for config {config_id} in {search_time:.3f}s")
+                
                 return docs
+                
             except Exception as e:
-                logger.error(f"❌ Vector retrieval failed: {e}")
+                search_time = time.time() - start_time
+                logger.error(f"❌ Vector search failed after {search_time:.3f}s: {str(e)}")
                 return []
         
 
@@ -238,8 +261,18 @@ def chat(config_id, chat_id):
             return jsonify({"message": f"Unsupported model: {model_name}"}), 400
 
         def format_docs(docs):
+            """Format retrieved documents into context for the LLM."""
+            if not docs:
+                logger.warning("⚠️ No documents to format - empty context will be sent to LLM")
+                return ""
+            
             context = "\n\n".join(doc.page_content for doc in docs)
-            logger.info(f"📝 Context being sent to LLM ({len(docs)} docs, {len(context)} chars): {context[:300]}...")
+            logger.info(f"📝 Formatted context: {len(docs)} docs, {len(context):,} chars")
+            
+            # Log context preview (first 200 chars) for debugging
+            preview = context[:200].replace('\n', ' ') if context else "(empty)"
+            logger.debug(f"🔍 Context preview: {preview}...")
+            
             return context
 
         # Convert functions to runnables
@@ -263,27 +296,59 @@ def chat(config_id, chat_id):
             history_messages_key="history",
         )
 
-        # Get docs once for both context and sources
+        # Retrieve relevant documents and generate response
+        logger.info(f"💬 Processing chat query: '{user_input[:50]}{'...' if len(user_input) > 50 else ''}'")
+        
+        # Get relevant documents
         docs = filtered_retriever(user_input)
         context = format_docs(docs)
         
-        # Run the RAG chain
-        response_content = chain_with_history.invoke(
-            {"question": user_input, "context": context},
-            config={"configurable": {"session_id": chat_id}}
-        )
+        # Generate LLM response
+        logger.info(f"🤖 Generating LLM response with {len(context):,} chars of context...")
+        llm_start = time.time()
         
-        # Return response with sources
-        return jsonify({
-            "response": response_content,
-            "sources": [
-                {
-                    "source": doc.metadata.get("source", ""),
-                    "page_content": doc.page_content[:200] + "..."
-                } for doc in docs
-            ]
-        })
+        try:
+            response_content = chain_with_history.invoke(
+                {"question": user_input, "context": context},
+                config={"configurable": {"session_id": chat_id}}
+            )
+            
+            llm_time = time.time() - llm_start
+            logger.info(f"✅ LLM response generated in {llm_time:.2f}s ({len(response_content)} chars)")
+            
+            # Prepare source information
+            sources = []
+            for doc in docs:
+                source_info = {
+                    "source": doc.metadata.get("original_file", doc.metadata.get("source", "Unknown")),
+                    "page_content": doc.page_content[:200] + ("..." if len(doc.page_content) > 200 else ""),
+                    "chunk_index": doc.metadata.get("chunk_index", 0)
+                }
+                sources.append(source_info)
+            
+            logger.info(f"📊 Chat completed successfully: {len(docs)} sources, response length: {len(response_content)}")
+            
+            return jsonify({
+                "response": response_content,
+                "sources": sources,
+                "metadata": {
+                    "documents_found": len(docs),
+                    "context_length": len(context),
+                    "response_time": round(llm_time, 2)
+                }
+            })
+            
+        except Exception as llm_error:
+            llm_time = time.time() - llm_start
+            logger.error(f"❌ LLM generation failed after {llm_time:.2f}s: {str(llm_error)}")
+            return jsonify({
+                "error": "Failed to generate response",
+                "message": "An error occurred while processing your request."
+            }), 500
 
     except Exception as e:
-        logger.error(f"An unexpected error occurred in the chat endpoint: {e}", exc_info=True)
-        return jsonify({"message": "An internal server error occurred."}), 500
+        logger.error(f"❌ Unexpected error in chat endpoint: {str(e)}", exc_info=True)
+        return jsonify({
+            "error": "Internal server error",
+            "message": "An unexpected error occurred while processing your request."
+        }), 500
