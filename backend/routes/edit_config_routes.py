@@ -112,35 +112,67 @@ def delete_config(config_id):
         try:
             db = current_app.config['MONGO_DB']
             
-            # 1. Delete associated vector chunks from vector_collection
-            vector_collection = db['vector_collection']
-            vector_result = vector_collection.delete_many({"config_id": config_id})
-            current_app.logger.info(f"Deleted {vector_result.deleted_count} vector chunks for config_id: {config_id}")
+            # 1. Delete associated vector chunks from HNSW collection
+            hnsw_collection = db['hnsw']
+            vector_result = hnsw_collection.delete_many({"config_id": config_id})
+            current_app.logger.info(f"🗑️ Deleted {vector_result.deleted_count} HNSW vector chunks for config_id: {config_id}")
+            
+            # Also clean up old vector_collection if it exists (backward compatibility)
+            try:
+                old_vector_collection = db['vector_collection']
+                old_vector_result = old_vector_collection.delete_many({"config_id": config_id})
+                if old_vector_result.deleted_count > 0:
+                    current_app.logger.info(f"🗑️ Deleted {old_vector_result.deleted_count} old vector chunks for config_id: {config_id}")
+            except Exception:
+                pass  # Old collection might not exist
 
             # 2. Find all chat sessions associated with this config_id
             metadata_collection = db['chat_session_metadata']
-            sessions_to_delete = metadata_collection.find({"config_id": config_id})
+            sessions_to_delete = list(metadata_collection.find({"config_id": config_id}))
             session_ids_to_delete = [s['session_id'] for s in sessions_to_delete]
+            
+            chat_messages_deleted = 0
+            chat_sessions_deleted = 0
 
             if session_ids_to_delete:
+                current_app.logger.info(f"💬 Found {len(session_ids_to_delete)} chat sessions to delete for config_id: {config_id}")
+                
                 # 3. Delete all messages for those sessions from message_store
                 message_collection = db['message_store']
                 message_result = message_collection.delete_many({"SessionId": {"$in": session_ids_to_delete}})
-                current_app.logger.info(f"Deleted {message_result.deleted_count} chat messages for config_id: {config_id}")
+                chat_messages_deleted = message_result.deleted_count
+                current_app.logger.info(f"🗑️ Deleted {chat_messages_deleted} chat messages for config_id: {config_id}")
 
                 # 4. Delete the chat session metadata itself
                 metadata_result = metadata_collection.delete_many({"config_id": config_id})
-                current_app.logger.info(f"Deleted {metadata_result.deleted_count} chat session metadata entries for config_id: {config_id}")
+                chat_sessions_deleted = metadata_result.deleted_count
+                current_app.logger.info(f"🗑️ Deleted {chat_sessions_deleted} chat session metadata entries for config_id: {config_id}")
+            
+            # 5. Log cleanup summary
+            total_deleted = vector_result.deleted_count + chat_messages_deleted + chat_sessions_deleted
+            current_app.logger.info(f"✅ Cleanup complete for config_id {config_id}: "
+                                   f"{vector_result.deleted_count} vectors, "
+                                   f"{chat_messages_deleted} messages, "
+                                   f"{chat_sessions_deleted} sessions "
+                                   f"(Total: {total_deleted} items deleted)")
 
         except Exception as e:
-            current_app.logger.error(f"Error during cascading delete for config_id '{config_id}': {e}", exc_info=True)
+            current_app.logger.error(f"❌ Error during cascading delete for config_id '{config_id}': {e}", exc_info=True)
             # Warn the user that cleanup failed but the main config was deleted
             return jsonify({
                 "message": "Configuration deleted, but a failure occurred during data cleanup.",
                 "warning": str(e)
             }), 200
 
-        return jsonify({"message": "Configuration deleted successfully"}), 200
+        return jsonify({
+            "message": "Configuration and all associated data deleted successfully",
+            "details": {
+                "config_deleted": True,
+                "vectors_deleted": vector_result.deleted_count,
+                "chat_messages_deleted": chat_messages_deleted,
+                "chat_sessions_deleted": chat_sessions_deleted
+            }
+        }), 200
 
     except Exception as e:
         current_app.logger.error(f"An error occurred in delete_config: {e}", exc_info=True)
