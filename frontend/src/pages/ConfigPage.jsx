@@ -33,12 +33,12 @@ const FileUpload = ({ onFileChange, initialFiles }) => {
 
   const handleFileChange = (e) => {
     const newFiles = Array.from(e.target.files);
-    const maxFileSize = 50 * 1024 * 1024; // 50MB
+    const maxFileSize = 1024 * 1024 * 1024; // 1024MB
     const updatedFiles = [...files];
 
     newFiles.forEach(file => {
       if (file.size > maxFileSize) {
-        alert(`File ${file.name} is too large. Maximum size is 50MB.`);
+        alert(`File ${file.name} is too large. Maximum size is 1024MB.`);
         return;
       }
       updatedFiles.push(file);
@@ -74,7 +74,7 @@ const FileUpload = ({ onFileChange, initialFiles }) => {
           <p className={`text-sm ${isDragging ? 'text-indigo-400' : 'text-gray-400'}`}>
             {isDragging ? 'Drop files here' : 'Drag & drop files or click to browse'}
           </p>
-          <p className="text-xs text-gray-500 mt-1">Supports: TXT, PDF, DOCX, MD (Max 50MB each)</p>
+          <p className="text-xs text-gray-500 mt-1">Supports: TXT, PDF, DOCX, MD (Max 1024MB each)</p>
         </div>
       </div>
       <input

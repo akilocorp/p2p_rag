@@ -34,6 +34,9 @@ def create_app():
     app = Flask(__name__)
     CORS(app, resources={r"/api/*": {"origins": ["*"], "supports_credentials": True, "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}})
 
+    # Set the maximum file upload size to 1GB to match the frontend
+    app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024
+
 
     
     # Email configuration
