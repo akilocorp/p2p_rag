@@ -78,7 +78,20 @@ const EditConfigPage = () => {
   };
 
   const handleFileChange = (newFiles) => {
-    const updatedFiles = [...config.files, ...newFiles];
+    const maxFileSize = 1024 * 1024 * 1024; // 1GB
+    const validFiles = [];
+
+    newFiles.forEach(file => {
+      if (file.size > maxFileSize) {
+        alert(`File ${file.name} is too large. Maximum size is 1024MB.`);
+      } else {
+        validFiles.push(file);
+      }
+    });
+
+    if (validFiles.length === 0) return;
+
+    const updatedFiles = [...config.files, ...validFiles];
     const updatedDocuments = updatedFiles.map(f => f.name);
 
     setConfig(prev => ({
@@ -411,7 +424,7 @@ const EditConfigPage = () => {
                   <p className="text-xs text-gray-400">
                     Drag & drop files or click to browse
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">Supports: TXT, PDF, DOCX, MD (Max 10MB each)</p>
+                  <p className="text-xs text-gray-500 mt-1">Supports: TXT, PDF, DOCX, MD (Max 1024MB each)</p>
                 </div>
                 <input
                   type="file"
