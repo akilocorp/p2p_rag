@@ -11,7 +11,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_mongodb.vectorstores import MongoDBAtlasVectorSearch
 from langchain_mongodb.chat_message_histories import MongoDBChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
-from langchain_core.messages import BaseMessage, messages_from_dict, message_to_dict
+from langchain_core.messages import BaseMessage, messages_from_dict, message_to_dict, AIMessage
 from models.config import Config
 from bson import ObjectId
 from langchain_community.chat_models import ChatTongyi
@@ -259,6 +259,32 @@ def chat(config_id, chat_id):
         
         if not llm:
             return jsonify({"message": f"Unsupported model: {model_name}"}), 400
+
+        # --- Survey Chat: AI Speaks First Logic ---
+        config_type = config_document.get("config_type", "normal")
+        history = get_session_history(chat_id, user_id_for_history, config_id)
+
+        if config_type == 'survey' and not history.messages:
+            logger.info(f"🌱 New 'survey' chat detected (ID: {chat_id}). Fetching first question.")
+            try:
+                # Use a neutral query to fetch the first document/question
+                initial_docs = vector_store.similarity_search(query="start", k=1, pre_filter={"config_id": {"$eq": config_id}})
+                if not initial_docs:
+                    logger.error(f"❌ No initial document found for survey config {config_id}.")
+                    return jsonify({"error": "Survey start error", "message": "Could not find the first question for this survey."}), 500
+                
+                first_question = initial_docs[0].page_content
+                history.add_message(AIMessage(content=first_question))
+                
+                logger.info(f"✅ Successfully sent first survey question: '{first_question[:80]}...'" )
+                return jsonify({
+                    "response": first_question,
+                    "sources": [],
+                    "metadata": {"documents_found": 0, "context_length": 0, "response_time": 0}
+                })
+            except Exception as e:
+                logger.error(f"❌ Failed to fetch first survey question for config {config_id}: {e}", exc_info=True)
+                return jsonify({"error": "Survey start error", "message": "An internal error occurred while starting the survey."}), 500
 
         def format_docs(docs):
             """Format retrieved documents into context for the LLM."""

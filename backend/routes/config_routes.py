@@ -38,7 +38,7 @@ def getconfigs():
         # 2. Query the database for all configs matching the user_id.
         # This example assumes your Config model has a method like `find_by_user`.
         # If not, you can use `current_app.config['MONGO_COLLECTION'].find({"userid": user_id})`
-        user_configs_cursor = Config.find_by_user_id(user_id)
+        user_configs_cursor = Config.get_collection().find({"user_id": user_id, "config_type": "normal"})
 
         # 3. Serialize the documents for the JSON response
         configs_list = []
@@ -73,7 +73,7 @@ def get_single_config(config_id):
 
         # 3. Query the database for a document that matches BOTH the config_id and the user_id
         # This is a critical security check to prevent users from accessing others' configs.
-        config_document = Config.get_collection().find_one({"_id":ObjectId(config_id)})
+        config_document = Config.get_collection().find_one({"_id": ObjectId(config_id), "config_type": "normal"})
         logger.info(f"config {config_document}",exc_info=True)
         if config_document is None:
             return jsonify({"message": "Configuration not found"}), 404
@@ -115,40 +115,35 @@ def configure_model():
     API endpoint that now robustly handles 'instructions' or a full 'prompt_template'.
     """
     try:
-        # --- 1. Get User ID & Form Data (No change) ---
+        # --- 1. Get User ID & Form Data ---
         user_id = get_jwt_identity()
-        if not user_id:
-            return jsonify({"error": "User not authenticated"}), 401
+        data = request.form
+        uploaded_files = request.files.getlist('files')
+        current_app.logger.info(f"Received request for user {user_id} with data: {data}")
 
-        config_json_str = request.form.get('config')
-        if not config_json_str:
-            return jsonify({"message": "Missing 'config' part in form data"}), 400
+        # Parse the config JSON object sent from frontend
+        config_json = data.get('config')
+        if not config_json:
+            return jsonify({"error": "Missing config data"}), 400
         
         try:
-            config_data = json.loads(config_json_str)
+            import json
+            config_data = json.loads(config_json)
         except json.JSONDecodeError:
-            return jsonify({"message": "Invalid JSON in 'config' part"}), 400
-        
-        uploaded_files = request.files.getlist('files')
-        llm_type = config_data.get('model_name')
-        is_public = config_data.get('is_public')
+            return jsonify({"error": "Invalid config data format"}), 400
 
-        bot_name = config_data.get('bot_name', 'Assistant') # Default bot name
-        temperature_str = config_data.get('temperature')
+        bot_name = config_data.get('bot_name')
+        llm_type = config_data.get('model_name')  # Frontend sends 'model_name'
+        temperature_str = str(config_data.get('temperature', 0.5))
+        is_public = config_data.get('is_public', False)
+        instructions = config_data.get('instructions')
+        prompt_template = config_data.get('prompt_template')
         collection_name = config_data.get('collection_name')
 
-        # --- 2. Get both 'instructions' and 'prompt_template' ---
-        instructions = config_data.get('instructions')
-        custom_prompt_template = config_data.get('prompt_template')
-
-        # --- 3. Robustly Create the Final Prompt Template ---
-        final_prompt_template = ""
-
-        if custom_prompt_template:
-            # If a full template is provided, use it directly (highest priority)
-            final_prompt_template = custom_prompt_template
+        final_prompt_template = None
+        if prompt_template:
+            final_prompt_template = prompt_template
         elif instructions:
-            # Otherwise, if instructions are provided, build the template
             starter_template = """You are a helpful AI assistant named '{bot_name}'.
 Your goal is to answer questions accurately based on the context provided.
 
@@ -164,13 +159,10 @@ Answer:"""
                 instructions=instructions
             )
         else:
-            # If neither is provided, it's an error
             return jsonify({"error": "Missing required field: please provide either 'instructions' or a 'prompt_template'"}), 400
 
-        # --- 4. Validate Other Inputs (No change) ---
         if not all([llm_type, temperature_str]):
             return jsonify({"error": "Missing required fields: llm_type or temperature"}), 400
-        
         try:
             temperature = float(str(temperature_str))
             if not (0.0 <= temperature <= 2.0):
@@ -178,37 +170,35 @@ Answer:"""
         except (ValueError, TypeError):
             return jsonify({"error": "Temperature must be a number between 0.0 and 2.0"}), 400
 
-        # --- 5. Handle File Uploads (Updated) ---
         os.makedirs(UPLOAD_FOLDER, exist_ok=True)
         temp_file_paths = []
+        uploaded_filenames = []
         for file in uploaded_files:
             if file and allowed_file(file.filename):
-                if file.filename:
-                    filename = secure_filename(file.filename)
-                    temp_file_path = os.path.join(UPLOAD_FOLDER, filename)
-                    file.save(temp_file_path)
-                    temp_file_paths.append(temp_file_path)
+                filename = secure_filename(file.filename)
+                temp_file_path = os.path.join(UPLOAD_FOLDER, filename)
+                file.save(temp_file_path)
+                temp_file_paths.append(temp_file_path)
+                uploaded_filenames.append(filename)
             elif file and file.filename:
                 current_app.logger.warning(f"File type not allowed for {file.filename}, skipping.")
 
-        # --- 6. Save Configuration to MongoDB ---
-        mongo_collection = Config
+        import time
+        final_collection_name = collection_name or f"coll_{user_id}_{int(time.time())}"
 
-        # Get the filenames of uploaded files
-        uploaded_filenames = [secure_filename(file.filename) for file in uploaded_files if file and allowed_file(file.filename)]
-        
         config_document = {
             "user_id": user_id,
             "bot_name": bot_name,
-            "collection_name": "hnsw",
+            "collection_name": final_collection_name,
             "model_name": llm_type,
-            "prompt_template": final_prompt_template, # Save the dynamically created template
+            "prompt_template": final_prompt_template,
             "temperature": temperature,
             "is_public": is_public,
-            "documents": uploaded_filenames  # Store the filenames of uploaded documents
+            "documents": uploaded_filenames,
+            "config_type": "normal"
         }
         
-        result = mongo_collection.get_collection().insert_one(config_document)
+        result = Config.get_collection().insert_one(config_document)
         config_id = result.inserted_id
         config_document['_id'] = str(config_id)
 
@@ -217,7 +207,7 @@ Answer:"""
             process_files_and_create_vector_store(
                 temp_file_paths=temp_file_paths, 
                 user_id=user_id, 
-                collection_name="hnsw",
+                collection_name=final_collection_name,
                 config_id=config_id
             )
         

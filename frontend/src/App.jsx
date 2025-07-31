@@ -9,10 +9,12 @@ import RegisterPage from './pages/RegistrationPage';
 import LoginPage from './pages/LoginPage';
 import ConfigPage from './pages/ConfigPage';
 import ChatPage from './pages/ChatPage';
+import SurveyChatPage from './pages/SurveyChatPage';
 import ConfigList from './pages/ConfigList';
 import EmailVerificationPage from './pages/EmailVerification';
 import SideBar from './components/SideBar'; // Import the SideBar component
 import EditConfigPage from './pages/EditConfigPage';
+import SurveyConfigPage from './pages/SurveyConfigPage';
 
 // Import the ProtectedRoute component
 import ProtectedRoute from './components/ProtectedRoute';
@@ -32,6 +34,7 @@ function App() {
           <Route path="/verify-email" element={<EmailVerificationPage />} />
           <Route element={<PublicChatRoute />}>
             <Route path="/chat/:configId/:chatId?" element={<ChatPage />} />
+            <Route path="/survey-chat/:config_id" element={<SurveyChatPage />} />
           </Route>
           {/* Protected Routes - Requires authentication */}
           <Route element={<ProtectedRoute />}>
@@ -47,6 +50,7 @@ function App() {
             } />
             {}
             <Route path="/config" element={<ConfigPage />} />
+            <Route path="/survey-config" element={<SurveyConfigPage />} />
             <Route path="/edit-config" element={<EditConfigPage />} />
             <Route path="/config_list" element={<ConfigList />} />
 

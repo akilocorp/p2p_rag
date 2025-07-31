@@ -119,16 +119,16 @@ const ConfigPage = () => {
   const [config, setConfig] = useState({
     bot_name: '',
     model_name: 'gpt-3.5-turbo',
-    instructions: '',
     prompt_template: '',
-    temperature: 0.7,
-    rag_files: [],
-    collection_name: '',
+    instructions: '',
+    temperature: 0.5,
     is_public: false,
+    collection_name: '',
+    rag_files: []
   });
-  const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [fileUploadKey, setFileUploadKey] = useState(Date.now()); // Key to force re-render
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -181,16 +181,21 @@ const ConfigPage = () => {
       return;
     }
 
-    const configToSend = { ...config };
-    delete configToSend.rag_files;
+    const configData = {
+      bot_name: config.bot_name,
+      model_name: config.model_name,
+      temperature: config.temperature,
+      is_public: config.is_public,
+      collection_name: config.collection_name,
+    };
 
     if (promptMode === 'instructions') {
-      delete configToSend.prompt_template;
+      configData.instructions = config.instructions;
     } else {
-      delete configToSend.instructions;
+      configData.prompt_template = config.prompt_template;
     }
 
-    formData.append('config', JSON.stringify(configToSend));
+    formData.append('config', JSON.stringify(configData));
 
     try {
       const token = localStorage.getItem('jwtToken');
@@ -381,7 +386,7 @@ const ConfigPage = () => {
                   <p className="mt-1 text-sm text-red-400">{errors.prompt_template}</p>
                 )}
                 <p className="mt-2 text-xs text-gray-400">
-                  Use placeholders like {{context}} and {{query}} that will be replaced during runtime
+                  Use placeholders like {'{context}'} and {'{query}'} that will be replaced during runtime
                 </p>
               </div>
             )}
