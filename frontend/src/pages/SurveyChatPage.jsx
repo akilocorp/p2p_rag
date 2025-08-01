@@ -83,12 +83,41 @@ const SurveyChatPage = () => {
       setError(null);
       
       try {
+        // === SURVEY CONFIG LOADING ===
+        let configResponse;
+        
+        // The backend survey_config endpoint handles both public and private access
+        // Try with authentication if available, otherwise try without auth
+        try {
+          if (isAuthenticated) {
+            // Try with authentication first (works for both public and private surveys)
+            configResponse = await apiClient.get(`/survey_config/${config_id}`);
+          } else {
+            // Try without authentication (works for public surveys only)
+            const axios = (await import('axios')).default;
+            configResponse = await axios.get(`/api/survey_config/${config_id}`);
+          }
+        } catch (error) {
+          // If the first attempt fails and user is authenticated, try without auth
+          // This handles the case where an authenticated user tries to access a public survey
+          // but there might be some auth issue
+          if (isAuthenticated && (error.response?.status === 401 || error.response?.status === 403)) {
+            try {
+              const axios = (await import('axios')).default;
+              configResponse = await axios.get(`/api/survey_config/${config_id}`);
+            } catch (fallbackError) {
+              throw fallbackError;
+            }
+          } else {
+            throw error;
+          }
+        }
+        
+        setConfig(configResponse.data.config);
+        
+        // === SURVEY CHAT INITIALIZATION/LOADING ===
         const token = localStorage.getItem('jwtToken');
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
-        // Fetch config details first
-                const configResponse = await apiClient.get(`/survey_config/${config_id}`, { headers });
-        setConfig(configResponse.data.config);
 
         if (currentChatId) { // Load existing chat history
           const historyResponse = await apiClient.get(`/history/${currentChatId}`, { headers });
@@ -122,8 +151,18 @@ const SurveyChatPage = () => {
           }
         }
       } catch (err) {
-        console.error('Chat initialization error:', err);
-        setError('Failed to start or load the survey. Please try refreshing the page.');
+        console.error('Survey chat initialization error:', err);
+        
+        // Handle specific error types
+        if (err.response?.status === 404) {
+          setError('Survey configuration not found. Please check the URL or contact the survey creator.');
+        } else if (err.response?.status === 401 || err.response?.status === 403) {
+          setError('You do not have permission to access this survey. Please log in or contact the survey creator.');
+        } else if (err.code === 'NETWORK_ERROR' || !err.response) {
+          setError('Network error. Please check your connection and try again.');
+        } else {
+          setError('Failed to load the survey configuration. Please try refreshing the page.');
+        }
       } finally {
         setIsInitializing(false);
       }
@@ -207,24 +246,27 @@ const SurveyChatPage = () => {
 
   return (
     <div className="flex h-screen bg-gray-900 text-white font-sans">
-      <ChatSidebar
-        config={config}
-        configId={config_id}
-        sessions={sessions}
-        userInfo={userInfo}
-        userInfoLoaded={userInfoLoaded}
-        isAuthenticated={isAuthenticated}
-        currentChatId={currentChatId}
-        onNewChat={() => navigate(`/survey-chat/${config_id}`)}
-        isSidebarCollapsed={isSidebarCollapsed}
-        setIsSidebarCollapsed={setIsSidebarCollapsed}
-        showSidebar={showSidebar}
-        setShowSidebar={setShowSidebar}
-        isLoading={sessionsLoading}
-        chatType="survey"
-      />
+      {/* Only show sidebar for authenticated users */}
+      {isAuthenticated && (
+        <ChatSidebar
+          config={config}
+          configId={config_id}
+          sessions={sessions}
+          userInfo={userInfo}
+          userInfoLoaded={userInfoLoaded}
+          isAuthenticated={isAuthenticated}
+          currentChatId={currentChatId}
+          onNewChat={() => navigate(`/survey-chat/${config_id}`)}
+          isSidebarCollapsed={isSidebarCollapsed}
+          setIsSidebarCollapsed={setIsSidebarCollapsed}
+          showSidebar={showSidebar}
+          setShowSidebar={setShowSidebar}
+          isLoading={sessionsLoading}
+          chatType="survey"
+        />
+      )}
       <div className={`flex-1 flex flex-col transition-all duration-300 ${
-        !isSidebarCollapsed ? 'md:ml-72' : 'md:ml-0'
+        isAuthenticated && !isSidebarCollapsed ? 'md:ml-72' : 'md:ml-0'
       }`}>
         {isInitializing && (
           <div className="absolute inset-0 z-10 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center">
@@ -237,13 +279,16 @@ const SurveyChatPage = () => {
 
         <header className="p-4 bg-gray-900 ">
           <div className="container mx-auto flex items-center justify-between">
-            <button 
-              disabled={isLoading || isInitializing} 
-              className="md:hidden p-2 rounded-full bg-indigo-600 text-white disabled:bg-gray-500 transition-colors"
-              onClick={() => setShowSidebar(true)}
-            >
-              <FiChevronRight className="text-xl" />
-            </button>
+            {/* Only show mobile sidebar toggle for authenticated users */}
+            {isAuthenticated && (
+              <button 
+                disabled={isLoading || isInitializing} 
+                className="md:hidden p-2 rounded-full bg-indigo-600 text-white disabled:bg-gray-500 transition-colors"
+                onClick={() => setShowSidebar(true)}
+              >
+                <FiChevronRight className="text-xl" />
+              </button>
+            )}
           </div>
         </header>
 

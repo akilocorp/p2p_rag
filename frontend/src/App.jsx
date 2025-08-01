@@ -18,7 +18,8 @@ import SurveyConfigPage from './pages/SurveyConfigPage';
 
 // Import the ProtectedRoute component
 import ProtectedRoute from './components/ProtectedRoute';
-import PublicChatRoute from './components/PublicChatRoute'; 
+import PublicChatRoute from './components/PublicChatRoute';
+import PublicSurveyChatRoute from './components/PublicSurveyChatRoute'; 
 
 function App() {
   // You might manage authentication state here or in a context
@@ -34,6 +35,8 @@ function App() {
           <Route path="/verify-email" element={<EmailVerificationPage />} />
           <Route element={<PublicChatRoute />}>
             <Route path="/chat/:configId/:chatId?" element={<ChatPage />} />
+          </Route>
+          <Route element={<PublicSurveyChatRoute />}>
             <Route path="/survey-chat/:config_id" element={<SurveyChatPage />} />
             <Route path="/survey-chat/:config_id/:chat_id" element={<SurveyChatPage />} />
           </Route>

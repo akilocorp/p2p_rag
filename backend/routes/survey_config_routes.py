@@ -91,6 +91,15 @@ def configure_survey_model():
         collection_name = config_data.get('collection_name')
         instructions = config_data.get('instructions')
         use_advanced_template = config_data.get('use_advanced_template', False)
+        
+        # New survey parameters for advanced template
+        survey_purpose = config_data.get('survey_purpose', 'gathering feedback')
+        target_audience = config_data.get('target_audience', 'general users')
+        creativity_rate = config_data.get('creativity_rate', 3)
+        
+        # Calculate temperature from creativity rate (1-5 scale to 0.1-0.9 temperature)
+        temperature = 0.1 + (creativity_rate - 1) * 0.2  # 1->0.1, 2->0.3, 3->0.5, 4->0.7, 5->0.9
+        
         uploaded_files = request.files.getlist('files')
 
         if not bot_name:
@@ -123,10 +132,14 @@ def configure_survey_model():
             "model_name": llm_type,
             "instructions": instructions,
             "use_advanced_template": use_advanced_template,
-            "temperature": 0.5, # Default or from config_data
+            "temperature": temperature, # Calculated from creativity_rate
             "is_public": is_public,
             "documents": uploaded_filenames,
-            "config_type": "survey"
+            "config_type": "survey",
+            # New survey parameters for advanced template
+            "survey_purpose": survey_purpose,
+            "target_audience": target_audience,
+            "creativity_rate": creativity_rate
         }
         
         result = Config.get_collection().insert_one(config_document)

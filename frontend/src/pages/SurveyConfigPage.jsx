@@ -113,6 +113,10 @@ const SurveyConfigPage = () => {
     collection_name: '',
     files: [],
     instructions: '',
+    // New survey parameters for advanced template
+    survey_purpose: '',
+    target_audience: '',
+    creativity_rate: 3,
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -149,6 +153,10 @@ const SurveyConfigPage = () => {
     // Add either instructions or use_advanced_template based on promptMode
     if (promptMode === 'advanced') {
       configToSubmit.use_advanced_template = true;
+      // Add survey parameters for advanced template
+      configToSubmit.survey_purpose = config.survey_purpose;
+      configToSubmit.target_audience = config.target_audience;
+      configToSubmit.creativity_rate = config.creativity_rate;
     } else {
       configToSubmit.instructions = config.instructions;
     }
@@ -229,6 +237,30 @@ const SurveyConfigPage = () => {
               </select>
             </div>
 
+            <div className="p-4 bg-gray-700/50 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label htmlFor="is_public" className="block text-sm font-medium text-gray-300 mb-1">
+                    Public Access
+                  </label>
+                  <p className="text-xs text-gray-400">
+                    Allow anyone with the link to participate in the survey without logging in
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    id="is_public"
+                    name="is_public"
+                    className="sr-only peer"
+                    checked={config.is_public}
+                    onChange={handleChange}
+                  />
+                  <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-focus:ring-2 peer-focus:ring-indigo-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+            </div>
+
             <div>
               <div className="flex items-center bg-gray-700/50 rounded-lg p-1 w-full md:w-auto mb-4">
                 <button
@@ -268,41 +300,68 @@ const SurveyConfigPage = () => {
                   {errors.instructions && <p className="mt-1 text-sm text-red-400">{errors.instructions}</p>}
                 </div>
               ) : (
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Advanced Template
-                  </label>
-                  <div className="w-full px-4 py-3 text-sm text-gray-300 bg-gray-700/50 border border-gray-600/50 rounded-lg">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <FaRobot className="text-indigo-400" />
-                      <span className="font-medium text-indigo-400">Hard-coded Survey Template</span>
-                    </div>
-                    <p className="text-xs text-gray-400 leading-relaxed">
-                      This option uses a pre-built template optimized for conducting surveys based on your uploaded documents. 
-                      The AI will automatically extract questions from your documents and ask them systematically.
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2 mb-4">
+                    <FaRobot className="text-indigo-400" />
+                    <span className="font-medium text-indigo-400">Advanced Survey Template</span>
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="survey_purpose" className="block text-sm font-medium text-gray-300 mb-2">
+                      Survey Purpose
+                    </label>
+                    <input
+                      id="survey_purpose"
+                      name="survey_purpose"
+                      type="text"
+                      value={config.survey_purpose}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 text-white bg-gray-700/70 border border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="e.g., gathering customer feedback, employee satisfaction survey"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="target_audience" className="block text-sm font-medium text-gray-300 mb-2">
+                      Target Audience
+                    </label>
+                    <input
+                      id="target_audience"
+                      name="target_audience"
+                      type="text"
+                      value={config.target_audience}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 text-white bg-gray-700/70 border border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="e.g., customers, employees, students, general users"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="creativity_rate" className="block text-sm font-medium text-gray-300 mb-2">
+                      Creativity Rate (1-5)
+                    </label>
+                    <select
+                      id="creativity_rate"
+                      name="creativity_rate"
+                      value={config.creativity_rate}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 text-white bg-gray-700/70 border border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value={1}>1 - Strict (Ask questions exactly as provided)</option>
+                      <option value={2}>2 - Slightly Flexible (Minor rephrasing)</option>
+                      <option value={3}>3 - Moderate (Conversational adaptation)</option>
+                      <option value={4}>4 - Creative (Reorder and adapt questions)</option>
+                      <option value={5}>5 - Highly Creative (Generate follow-up questions)</option>
+                    </select>
+                  </div>
+                  
+                  <div className="mt-3 p-3 bg-gray-800/50 rounded border-l-2 border-indigo-500">
+                    <p className="text-xs text-gray-300">
+                      💡 <strong>Advanced Template:</strong> Creates an interactive survey bot that adapts its questioning style based on your creativity rate and automatically extracts questions from your uploaded documents.
                     </p>
-                    <div className="mt-3 p-3 bg-gray-800/50 rounded border-l-2 border-indigo-500">
-                      <p className="text-xs text-gray-300 font-mono">
-                        "You are a professional survey conductor. Your job is to ask survey questions ONLY from the provided context documents..."
-                      </p>
-                    </div>
                   </div>
                 </div>
               )}
-            </div>
-
-            <div className="flex items-center justify-between bg-gray-700/50 p-4 rounded-lg">
-              <label htmlFor="is_public" className="text-sm font-medium text-gray-300">Make Assistant Public</label>
-              <div className="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
-                  <input 
-                      type="checkbox" 
-                      name="is_public" 
-                      id="is_public"
-                      checked={config.is_public}
-                      onChange={handleChange}
-                      className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
-                  <label htmlFor="is_public" className="toggle-label block overflow-hidden h-6 rounded-full bg-gray-600 cursor-pointer"></label>
-              </div>
             </div>
 
             <FileUpload onFileChange={handleFileChange} initialFiles={config.files} />

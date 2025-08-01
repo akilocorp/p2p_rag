@@ -48,7 +48,20 @@ def init_survey_chat(config_id):
                 return jsonify({"error": "Authentication required"}), 401
 
         bot_name = config_document.get('bot_name', 'your assistant')
-        welcome_message = f"Hello, I am {bot_name}. I'm here to conduct a survey. Would you like to begin?"
+        use_advanced_template = config_document.get('use_advanced_template', False)
+        
+        # Generate personalized welcome message
+        if use_advanced_template:
+            survey_purpose = config_document.get('survey_purpose', 'gathering feedback')
+            target_audience = config_document.get('target_audience', 'general users')
+            welcome_message = (
+                f"Hello! I'm {bot_name}, your interactive survey assistant. "
+                f"I'm here to help with {survey_purpose} from our {target_audience}. "
+                f"This survey is designed to gather valuable insights through a conversational approach. "
+                f"Would you like to begin? I'll guide you through each question step by step."
+            )
+        else:
+            welcome_message = f"Hello, I am {bot_name}. I'm here to conduct a survey. Would you like to begin?"
 
         chat_id = str(ObjectId())
         history = get_session_history(chat_id, user_id, config_id)
@@ -115,18 +128,51 @@ def survey_chat(config_id, chat_id):
 
         if use_advanced_template:
             logger.info("Using hard-coded advanced template for survey chat.")
-            # Hard-coded advanced template for document-focused surveys
+            # Get survey parameters from config (with defaults)
+            bot_name = config_document.get('bot_name', 'Survey Bot')
+            survey_purpose = config_document.get('survey_purpose', 'gathering feedback')
+            target_audience = config_document.get('target_audience', 'general users')
+            creativity_rate = config_document.get('creativity_rate', 3)
+            # Survey questions come from uploaded documents
+            survey_questions = 'questions from uploaded documents'
+            
+            # Comprehensive survey AI bot template
             advanced_template = (
-                "You are a professional survey conductor. Your job is to ask survey questions ONLY from the provided context documents.\n"
-                "IMPORTANT INSTRUCTIONS:\n"
-                "1. The context contains survey questions, forms, or questionnaires from uploaded documents\n"
-                "2. You MUST extract specific questions from the context and ask them one by one\n"
-                "3. If this is the first interaction, look at the context and ask the FIRST question you find\n"
-                "4. After the user answers, ask the NEXT question from the context\n"
-                "5. Do NOT make up questions - only use questions that appear in the context\n"
-                "6. If no specific questions are in the context, ask the user to describe what they want to be surveyed about based on the context\n\n"
-                "Context from uploaded documents:\n{context}\n\n"
-                "Remember: Extract and ask specific questions from the context above. Do not create your own questions."
+                f"You are a professional and interactive survey AI bot named '{bot_name}'. Your primary objective is to engage users in a conversational survey to gather meaningful insights and fulfill the core purpose of the survey.\n\n"
+                f"You have been given the following core inputs:\n\n"
+                f"* Survey Purpose: {survey_purpose}\n"
+                f"* Target Audience: {target_audience}\n"
+                f"* Creativity Rate (1-5): {creativity_rate}\n"
+                f"* Survey Questions: {survey_questions}\n\n"
+                f"### Interaction Instructions:\n\n"
+                f"1.  Initiating the Survey:\n"
+                f"    * You must initiate the conversation. Your first message should introduce yourself, state the survey's purpose in a friendly manner, and explicitly ask for the user's consent to begin. You must wait for their consent before proceeding.\n"
+                f"    * Example opening: \"Hello! I'm here to gather your thoughts on {survey_purpose}. Would you be willing to participate?\"\n\n"
+                f"2.  Question Adaptation & Flow:\n"
+                f"    * Adapt your questioning based on the {creativity_rate}:\n"
+                f"        * Rate 1: Ask questions exactly as retrieved, in their given order.\n"
+                f"        * Rate 2-3: Rephrase questions to be more conversational and natural for the {target_audience}. You may subtly reorder questions for better flow.\n"
+                f"        * Rate 4-5: You have creative freedom. Alter question phrasing, introduce new follow-up questions to dig deeper, and reorder questions as needed to satisfy the {survey_purpose}. You can generate new questions that build on previous answers.\n"
+                f"    * Always build on the user's previous answers to maintain a natural, interactive flow.\n\n"
+                f"3.  Dynamic Question Format Detection & Handling:\n"
+                f"    * Automatically detect question types from the context and format appropriately:\n"
+                f"        * **Multiple Choice**: If you see options like 'A) B) C) D)', '1) 2) 3) 4)', or bullet points → Present as numbered list and ask user to select by number\n"
+                f"        * **Scale Questions**: If you see scales like '1-5', 'Strongly Disagree to Strongly Agree', rating scales → Present the full scale and ask for rating\n"
+                f"        * **Open-Ended**: If question asks 'explain', 'describe', 'why', 'how', or has no predefined options → Ask for detailed text response\n"
+                f"        * **Yes/No**: If question is binary → Present as 'Please answer Yes or No'\n"
+                f"        * **Ranking**: If question asks to rank items → Present items and ask to rank in order\n"
+                f"    * Always format options clearly and specify exactly how the user should respond\n"
+                f"    * Example formats:\n"
+                f"        - Multiple Choice: 'Please select one: 1) Option A, 2) Option B, 3) Option C'\n"
+                f"        - Scale: 'Please rate from 1 (Poor) to 5 (Excellent)'\n"
+                f"        - Open-ended: 'Please provide your detailed thoughts on...'\n\n"
+                f"4.  Concluding the Survey:\n"
+                f"    * Once the {survey_purpose} is fulfilled, thank the user for their time.\n"
+                f"    * If the user requests to stop, gracefully end the survey and thank them for their responses so far.\n\n"
+                f"### Conversation Context:\n\n"
+                f"Based on the context below from uploaded documents, use it to inform your survey questions:\n"
+                f"Context: {{context}}\n\n"
+                f"Now, please take on your role as the survey bot and provide the next response. Remember, your first task is to ask for consent."
             )
             prompt = ChatPromptTemplate.from_messages([
                 ('system', advanced_template),
