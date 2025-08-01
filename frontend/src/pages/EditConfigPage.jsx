@@ -289,6 +289,22 @@ const EditConfigPage = () => {
               {errors.bot_name && <p className="mt-1 text-sm text-red-400">{errors.bot_name}</p>}
             </div>
 
+            {/* Collection Name (Read-Only) */}
+            {/* <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Collection Name</label>
+              <input
+                id="collection_name"
+                name="collection_name"
+                type="text"
+                value={config.collection_name}
+                readOnly
+                className="w-full px-4 py-3 text-gray-400 bg-gray-800/60 border border-gray-700 rounded-lg focus:outline-none cursor-not-allowed"
+              />
+              <p className="mt-1 text-xs text-gray-400">
+                The collection name cannot be changed after creation to ensure knowledge base integrity.
+              </p>
+            </div> */}
+
             {/* Model Name */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Model Name</label>
@@ -302,7 +318,7 @@ const EditConfigPage = () => {
                   <option value="deepseek-chat">Deepseek Chat</option>
                   <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
                   <option value="qwen-turbo">Qwen Turbo</option>
-                </select>
+              </select>
               {errors.model_name && <p className="mt-1 text-sm text-red-400">{errors.model_name}</p>}
             </div>
 
@@ -530,9 +546,24 @@ const EditConfigPage = () => {
                 )}
               </div>
             )}
-
-            {/* Collection Name */}
+              
+               {/* Collection Name (Read-Only) */}
             <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Collection Name</label>
+              <input
+                id="collection_name"
+                name="collection_name"
+                type="text"
+                value={config.collection_name}
+                readOnly
+                className="w-full px-4 py-3 text-gray-400 bg-gray-800/60 border border-gray-700 rounded-lg focus:outline-none cursor-not-allowed"
+              />
+              <p className="mt-1 text-xs text-gray-400">
+                The collection name cannot be changed after creation to ensure knowledge base integrity.
+              </p>
+            </div>
+            {/* Collection Name */}
+            {/* <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Collection Name</label>
               <input
                 type="text"
@@ -542,7 +573,7 @@ const EditConfigPage = () => {
                 className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 placeholder="Enter collection name"
               />
-            </div>
+            </div> */}
 
             {/* File Upload */}
             <div>
