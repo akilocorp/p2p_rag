@@ -20,7 +20,13 @@ const EditConfigPage = () => {
         prompt_template: '',
         collection_name: '',
         documents: [],
-        config_id: null
+        config_id: null,
+        config_type: 'normal',
+        // Survey-specific parameters
+        survey_purpose: '',
+        target_audience: '',
+        creativity_rate: 3,
+        use_advanced_template: false
       };
     }
     
@@ -69,6 +75,20 @@ const EditConfigPage = () => {
         size: 0 // We don't have the actual size here
       })) || []
     }));
+
+    // Initialize prompt mode based on config type and settings
+    if (configFromState.config_type === 'survey') {
+      setPromptMode(configFromState.use_advanced_template ? 'advanced' : 'instructions');
+    } else {
+      // For normal configs, check if they have use_advanced_template or prompt_template
+      if (configFromState.use_advanced_template) {
+        setPromptMode('advanced');
+      } else if (configFromState.prompt_template) {
+        setPromptMode('advanced'); // Legacy prompt_template configs now use advanced mode
+      } else {
+        setPromptMode('instructions');
+      }
+    }
   }, [location.state, navigate]);
 
   const handleChange = (e) => {
@@ -151,6 +171,20 @@ const EditConfigPage = () => {
         prompt_template: config.prompt_template || '',
         collection_name: config.collection_name || ''
       };
+
+      // Handle advanced template mode for both config types
+      if (promptMode === 'advanced') {
+        requestData.use_advanced_template = true;
+        
+        // Add survey-specific parameters if this is a survey config
+        if (config.config_type === 'survey') {
+          requestData.survey_purpose = config.survey_purpose || '';
+          requestData.target_audience = config.target_audience || '';
+          requestData.creativity_rate = config.creativity_rate || 3;
+        }
+      } else {
+        requestData.use_advanced_template = false;
+      }
 
       // Determine if we need to use FormData based on whether files exist
       let configData;
@@ -321,63 +355,189 @@ const EditConfigPage = () => {
               </div>
             </div>
 
-            {/* Prompt Mode Selection */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Prompt Mode</label>
-              <div className="flex space-x-4">
-                <label className="flex items-center space-x-2">
-                  <input
-                    type="radio"
-                    name="prompt_mode"
-                    value="instructions"
-                    checked={promptMode === 'instructions'}
-                    onChange={() => handlePromptModeChange('instructions')}
-                    className="w-4 h-4 text-indigo-500 bg-gray-700 border-gray-600 rounded focus:ring-indigo-500"
-                  />
-                  <span className="text-sm text-gray-300">Instructions</span>
-                </label>
-                <label className="flex items-center space-x-2">
-                  <input
-                    type="radio"
-                    name="prompt_mode"
-                    value="template"
-                    checked={promptMode === 'template'}
-                    onChange={() => handlePromptModeChange('template')}
-                    className="w-4 h-4 text-indigo-500 bg-gray-700 border-gray-600 rounded focus:ring-indigo-500"
-                  />
-                  <span className="text-sm text-gray-300">Prompt Template</span>
-                </label>
+            {/* Config Type Specific Fields */}
+            {config.config_type === 'survey' ? (
+              // Survey Config Fields
+              <>
+                {/* Prompt Mode Selection for Survey */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Prompt Mode</label>
+                  <div className="flex space-x-4">
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        name="prompt_mode"
+                        value="instructions"
+                        checked={promptMode === 'instructions'}
+                        onChange={() => handlePromptModeChange('instructions')}
+                        className="w-4 h-4 text-indigo-500 bg-gray-700 border-gray-600 rounded focus:ring-indigo-500"
+                      />
+                      <span className="text-sm text-gray-300">Instructions</span>
+                    </label>
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        name="prompt_mode"
+                        value="advanced"
+                        checked={promptMode === 'advanced'}
+                        onChange={() => handlePromptModeChange('advanced')}
+                        className="w-4 h-4 text-indigo-500 bg-gray-700 border-gray-600 rounded focus:ring-indigo-500"
+                      />
+                      <span className="text-sm text-gray-300">Advanced Template</span>
+                    </label>
+                  </div>
+
+                  {promptMode === 'instructions' && (
+                    <textarea
+                      name="instructions"
+                      value={config.instructions}
+                      onChange={handleChange}
+                      rows="4"
+                      className="w-full px-4 py-2 mt-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      placeholder="Enter instructions for the survey bot..."
+                    />
+                  )}
+
+                  {promptMode === 'advanced' && (
+                    <div className="mt-4 space-y-4">
+                      {/* Survey Purpose */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Survey Purpose
+                        </label>
+                        <input
+                          type="text"
+                          name="survey_purpose"
+                          value={config.survey_purpose}
+                          onChange={handleChange}
+                          className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          placeholder="e.g., gathering student feedback, market research"
+                        />
+                      </div>
+
+                      {/* Target Audience */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Target Audience
+                        </label>
+                        <input
+                          type="text"
+                          name="target_audience"
+                          value={config.target_audience}
+                          onChange={handleChange}
+                          className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          placeholder="e.g., students, customers, employees"
+                        />
+                      </div>
+
+                      {/* Creativity Rate */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Creativity Rate
+                          <span className="text-xs text-gray-400 ml-2">
+                            ({config.creativity_rate === 1 ? 'Very Conservative' : 
+                              config.creativity_rate === 2 ? 'Conservative' :
+                              config.creativity_rate === 3 ? 'Moderate' :
+                              config.creativity_rate === 4 ? 'Creative' : 'Very Creative'})
+                          </span>
+                        </label>
+                        <input
+                          type="range"
+                          name="creativity_rate"
+                          min="1"
+                          max="5"
+                          step="1"
+                          value={config.creativity_rate}
+                          onChange={handleChange}
+                          className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                        />
+                        <div className="flex justify-between text-xs text-gray-400 mt-1">
+                          <span>1</span>
+                          <span>2</span>
+                          <span>3</span>
+                          <span>4</span>
+                          <span>5</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {promptMode === 'instructions' && errors.instructions && (
+                    <p className="mt-1 text-sm text-red-400">{errors.instructions}</p>
+                  )}
+                </div>
+              </>
+            ) : (
+              // Normal Config Fields - Match creation page exactly
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Configuration Method</label>
+                <div className="flex space-x-4">
+                  <button
+                    type="button"
+                    onClick={() => handlePromptModeChange('instructions')}
+                    className={`px-4 py-2 rounded-lg transition-all ${
+                      promptMode === 'instructions'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-gray-700/50 text-gray-300 hover:bg-gray-700'
+                    }`}
+                  >
+                    Simple Instructions
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handlePromptModeChange('advanced')}
+                    className={`px-4 py-2 rounded-lg transition-all ${
+                      promptMode === 'advanced'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-gray-700/50 text-gray-300 hover:bg-gray-700'
+                    }`}
+                  >
+                    Advanced Template
+                  </button>
+                </div>
+
+                {promptMode === 'instructions' ? (
+                  <div className="mt-4">
+                    <label htmlFor="instructions" className="block text-sm font-medium text-gray-300 mb-2">
+                      Behavior Instructions
+                    </label>
+                    <textarea
+                      id="instructions"
+                      name="instructions"
+                      value={config.instructions}
+                      onChange={handleChange}
+                      rows="5"
+                      className="w-full px-4 py-3 text-white bg-gray-700/70 border border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="Example: You are a helpful customer support assistant for a tech company. Be polite and professional in your responses."
+                    />
+                    {errors.instructions && (
+                      <p className="mt-1 text-sm text-red-400">{errors.instructions}</p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Advanced Template
+                    </label>
+                    <div className="w-full px-4 py-3 text-sm text-gray-300 bg-gray-700/50 border border-gray-600/50 rounded-lg">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <FaRobot className="text-indigo-400" />
+                        <span className="font-medium text-indigo-400">Hard-coded Normal Chat Template</span>
+                      </div>
+                      <p className="text-xs text-gray-400 leading-relaxed">
+                        This option uses a pre-built template optimized for normal chat conversations with document context. 
+                        The AI will be polite and helpful, answering questions based on your uploaded documents.
+                      </p>
+                      <div className="mt-3 p-3 bg-gray-800/50 rounded border-l-2 border-indigo-500">
+                        <p className="text-xs text-gray-300 font-mono">
+                          "You are a helpful AI assistant named '{config.bot_name || '[Your Bot Name]'}'. Your goal is to answer questions accurately based on the context provided..."
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-
-              {promptMode === 'instructions' && (
-                <textarea
-                  name="instructions"
-                  value={config.instructions}
-                  onChange={handleChange}
-                  rows="4"
-                  className="w-full px-4 py-2 mt-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Enter instructions for the bot..."
-                />
-              )}
-
-              {promptMode === 'template' && (
-                <textarea
-                  name="prompt_template"
-                  value={config.prompt_template}
-                  onChange={handleChange}
-                  rows="4"
-                  className="w-full px-4 py-2 mt-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Enter prompt template..."
-                />
-              )}
-
-              {promptMode === 'instructions' && errors.instructions && (
-                <p className="mt-1 text-sm text-red-400">{errors.instructions}</p>
-              )}
-              {promptMode === 'template' && errors.prompt_template && (
-                <p className="mt-1 text-sm text-red-400">{errors.prompt_template}</p>
-              )}
-            </div>
+            )}
 
             {/* Collection Name */}
             <div>
