@@ -90,15 +90,15 @@ def configure_survey_model():
         is_public = config_data.get('is_public', False)
         collection_name = config_data.get('collection_name')
         instructions = config_data.get('instructions')
-        prompt_template = config_data.get('prompt_template')
+        use_advanced_template = config_data.get('use_advanced_template', False)
         uploaded_files = request.files.getlist('files')
 
         if not bot_name:
             return jsonify({"error": "Missing required field: bot_name"}), 400
         if not llm_type:
             return jsonify({"error": "Missing required field: llm_type"}), 400
-        if not instructions and not prompt_template:
-            return jsonify({"error": "Either instructions or a prompt_template must be provided"}), 400
+        if not instructions and not use_advanced_template:
+            return jsonify({"error": "Either instructions or use_advanced_template is required"}), 400
 
         os.makedirs(UPLOAD_FOLDER, exist_ok=True)
         temp_file_paths = []
@@ -122,7 +122,7 @@ def configure_survey_model():
             "collection_name": collection_name,
             "model_name": llm_type,
             "instructions": instructions,
-            "prompt_template": prompt_template,
+            "use_advanced_template": use_advanced_template,
             "temperature": 0.5, # Default or from config_data
             "is_public": is_public,
             "documents": uploaded_filenames,

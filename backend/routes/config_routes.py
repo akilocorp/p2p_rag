@@ -137,12 +137,29 @@ def configure_model():
         temperature_str = str(config_data.get('temperature', 0.5))
         is_public = config_data.get('is_public', False)
         instructions = config_data.get('instructions')
-        prompt_template = config_data.get('prompt_template')
+        use_advanced_template = config_data.get('use_advanced_template', False)
         collection_name = config_data.get('collection_name')
 
         final_prompt_template = None
-        if prompt_template:
-            final_prompt_template = prompt_template
+        if use_advanced_template:
+            # Hard-coded advanced template for normal chat
+            final_prompt_template = f"""You are a helpful AI assistant named '{bot_name}'.
+Your goal is to answer questions accurately based on the context provided.
+
+Follow these specific instructions:
+- Be helpful, professional, and polite in all responses
+- Always prioritize information from the provided context over general knowledge
+- If the context contains relevant information, use it to provide accurate and detailed answers
+- When the context doesn't contain sufficient information, clearly state this limitation
+- Provide direct, concise answers while being thorough when context supports it
+- If asked about topics not covered in the context, politely redirect to document-based questions
+- Maintain a conversational yet professional tone
+- Always cite or reference the context when using information from it
+
+Based on the context below, please answer the user's question. If the context doesn't contain the answer, say so.
+Context: {{context}}
+Question: {{question}}
+Answer:"""
         elif instructions:
             starter_template = """You are a helpful AI assistant named '{bot_name}'.
 Your goal is to answer questions accurately based on the context provided.
@@ -159,7 +176,7 @@ Answer:"""
                 instructions=instructions
             )
         else:
-            return jsonify({"error": "Missing required field: please provide either 'instructions' or a 'prompt_template'"}), 400
+            return jsonify({"error": "Either instructions or use_advanced_template is required"}), 400
 
         if not all([llm_type, temperature_str]):
             return jsonify({"error": "Missing required fields: llm_type or temperature"}), 400

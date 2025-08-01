@@ -119,7 +119,6 @@ const ConfigPage = () => {
   const [config, setConfig] = useState({
     bot_name: '',
     model_name: 'gpt-3.5-turbo',
-    prompt_template: '',
     instructions: '',
     temperature: 0.5,
     is_public: false,
@@ -157,9 +156,7 @@ const ConfigPage = () => {
     if (promptMode === 'instructions' && !config.instructions.trim()) {
       newErrors.instructions = 'Instructions are required';
     }
-    if (promptMode === 'template' && !config.prompt_template.trim()) {
-      newErrors.prompt_template = 'Prompt template is required';
-    }
+    // No validation needed for advanced template since it's hard-coded
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -189,10 +186,11 @@ const ConfigPage = () => {
       collection_name: config.collection_name,
     };
 
-    if (promptMode === 'instructions') {
-      configData.instructions = config.instructions;
+    // Add either instructions or use_advanced_template based on promptMode
+    if (promptMode === 'advanced') {
+      configData.use_advanced_template = true;
     } else {
-      configData.prompt_template = config.prompt_template;
+      configData.instructions = config.instructions;
     }
 
     formData.append('config', JSON.stringify(configData));
@@ -336,9 +334,9 @@ const ConfigPage = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => handlePromptModeChange('template')}
+                  onClick={() => handlePromptModeChange('advanced')}
                   className={`px-4 py-2 rounded-lg transition-all ${
-                    promptMode === 'template'
+                    promptMode === 'advanced'
                       ? 'bg-indigo-600 text-white'
                       : 'bg-gray-700/50 text-gray-300 hover:bg-gray-700'
                   }`}
@@ -370,24 +368,24 @@ const ConfigPage = () => {
               </div>
             ) : (
               <div>
-                <label htmlFor="prompt_template" className="block text-sm font-medium text-gray-300 mb-2">
-                  Prompt Template
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Advanced Template
                 </label>
-                <textarea
-                  id="prompt_template"
-                  name="prompt_template"
-                  value={config.prompt_template}
-                  onChange={handleChange}
-                  rows="5"
-                  className="w-full px-4 py-3 text-white bg-gray-700/70 border border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder={`Example template:\nYou are an expert in \\{topic\\}. Given the following context:\n\n\\{context\\}\n\nAnswer this question: \\{query\\}\n\nAnswer in a professional tone.`}
-                />
-                {errors.prompt_template && (
-                  <p className="mt-1 text-sm text-red-400">{errors.prompt_template}</p>
-                )}
-                <p className="mt-2 text-xs text-gray-400">
-                  Use placeholders like {'{context}'} and {'{query}'} that will be replaced during runtime
-                </p>
+                <div className="w-full px-4 py-3 text-sm text-gray-300 bg-gray-700/50 border border-gray-600/50 rounded-lg">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <FaRobot className="text-indigo-400" />
+                    <span className="font-medium text-indigo-400">Hard-coded Normal Chat Template</span>
+                  </div>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    This option uses a pre-built template optimized for normal chat conversations with document context. 
+                    The AI will be polite and helpful, answering questions based on your uploaded documents.
+                  </p>
+                  <div className="mt-3 p-3 bg-gray-800/50 rounded border-l-2 border-indigo-500">
+                    <p className="text-xs text-gray-300 font-mono">
+                      "You are a helpful AI assistant named '{config.bot_name || '[Your Bot Name]'}'. Your goal is to answer questions accurately based on the context provided..."
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
 

@@ -35,6 +35,7 @@ function App() {
           <Route element={<PublicChatRoute />}>
             <Route path="/chat/:configId/:chatId?" element={<ChatPage />} />
             <Route path="/survey-chat/:config_id" element={<SurveyChatPage />} />
+            <Route path="/survey-chat/:config_id/:chat_id" element={<SurveyChatPage />} />
           </Route>
           {/* Protected Routes - Requires authentication */}
           <Route element={<ProtectedRoute />}>

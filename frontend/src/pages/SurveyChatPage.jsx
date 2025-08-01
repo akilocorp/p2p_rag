@@ -78,7 +78,7 @@ const SurveyChatPage = () => {
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
         // Fetch config details first
-        const configResponse = await apiClient.get(`/config/${config_id}`, { headers });
+                const configResponse = await apiClient.get(`/survey_config/${config_id}`, { headers });
         setConfig(configResponse.data.config);
 
         if (currentChatId && messages.length === 0) { // Load existing chat history
@@ -89,13 +89,28 @@ const SurveyChatPage = () => {
           }));
           setMessages(formattedMessages);
         } else if (!currentChatId) { // Initialize new survey chat
-          const response = await apiClient.post(`/survey-chat/${config_id}/init`, {}, { headers });
-          const { response: initialMessage, chat_id: newChatId } = response.data;
+                              const response = await apiClient.post(`/survey-chat/${config_id}/init`, {}, { headers });
+          console.log('🔍 Init response:', response.data);
 
-          setMessages([{ text: initialMessage, sender: 'ai' }]);
-          setCurrentChatId(newChatId);
-          // Update URL without reloading the page
-          navigate(`/survey-chat/${config_id}/${newChatId}`, { replace: true });
+          const initialMessage = response.data.response || response.data.initial_message;
+          const newChatId = response.data.chat_id || response.data.session_id;
+          console.log('🔍 Parsed data:', { initialMessage, newChatId });
+
+          if (initialMessage && newChatId) {
+            const newMessage = { text: initialMessage, sender: 'ai' };
+            console.log('🔍 Setting message:', newMessage);
+            setMessages([newMessage]);
+            setCurrentChatId(newChatId);
+            console.log('🔍 State updated, navigating...');
+            // Update URL without reloading the page
+            navigate(`/survey-chat/${config_id}/${newChatId}`, { replace: true });
+          } else {
+            console.error('Failed to initialize chat: Backend response is missing expected keys.', {
+              'received_data': response.data,
+              'expected_keys': 'response/initial_message and chat_id/session_id'
+            });
+            setError('Failed to start the survey. The server response was invalid.');
+          }
         }
       } catch (err) {
         console.error('Chat initialization error:', err);

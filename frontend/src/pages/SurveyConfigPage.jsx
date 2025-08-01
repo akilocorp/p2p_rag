@@ -113,7 +113,6 @@ const SurveyConfigPage = () => {
     collection_name: '',
     files: [],
     instructions: '',
-    prompt_template: '',
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -144,10 +143,15 @@ const SurveyConfigPage = () => {
       llm_type: config.llm_type,
       is_public: config.is_public,
       collection_name: config.collection_name,
-      instructions: config.instructions,
-      prompt_template: config.prompt_template,
       config_type: 'survey'
     };
+
+    // Add either instructions or use_advanced_template based on promptMode
+    if (promptMode === 'advanced') {
+      configToSubmit.use_advanced_template = true;
+    } else {
+      configToSubmit.instructions = config.instructions;
+    }
 
     formData.append('config', JSON.stringify(configToSubmit));
 
@@ -265,22 +269,24 @@ const SurveyConfigPage = () => {
                 </div>
               ) : (
                 <div>
-                  <label htmlFor="prompt_template" className="block text-sm font-medium text-gray-300 mb-2">
-                    Prompt Template
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Advanced Template
                   </label>
-                  <textarea
-                    id="prompt_template"
-                    name="prompt_template"
-                    rows="6"
-                    value={config.prompt_template}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 font-mono text-sm text-white bg-gray-700/70 border border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    placeholder={`e.g., Use the following context to answer the question.\nContext: {context}\nQuestion: {query}\nAnswer:`}
-                  />
-                  {errors.prompt_template && <p className="mt-1 text-sm text-red-400">{errors.prompt_template}</p>}
-                  <p className="mt-2 text-xs text-gray-400">
-                    Use placeholders like {'{context}'} and {'{query}'} that will be replaced during runtime.
-                  </p>
+                  <div className="w-full px-4 py-3 text-sm text-gray-300 bg-gray-700/50 border border-gray-600/50 rounded-lg">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <FaRobot className="text-indigo-400" />
+                      <span className="font-medium text-indigo-400">Hard-coded Survey Template</span>
+                    </div>
+                    <p className="text-xs text-gray-400 leading-relaxed">
+                      This option uses a pre-built template optimized for conducting surveys based on your uploaded documents. 
+                      The AI will automatically extract questions from your documents and ask them systematically.
+                    </p>
+                    <div className="mt-3 p-3 bg-gray-800/50 rounded border-l-2 border-indigo-500">
+                      <p className="text-xs text-gray-300 font-mono">
+                        "You are a professional survey conductor. Your job is to ask survey questions ONLY from the provided context documents..."
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

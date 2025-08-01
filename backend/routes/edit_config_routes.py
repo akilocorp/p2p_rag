@@ -105,26 +105,28 @@ def delete_config(config_id):
         if not config_to_delete:
             return jsonify({"message": "Configuration not found or access denied"}), 404
 
-        # Delete the configuration from MongoDB
+        # Get the collection name from the config document before deleting it
+        collection_name = config_to_delete.get('collection_name')
+
+        # Now, delete the main configuration document
         Config.get_collection().delete_one({"_id": ObjectId(config_id)})
 
         # --- Cascading Delete --- 
         try:
             db = current_app.config['MONGO_DB']
             
-            # 1. Delete associated vector chunks from HNSW collection
-            hnsw_collection = db['hnsw']
-            vector_result = hnsw_collection.delete_many({"config_id": config_id})
-            current_app.logger.info(f"🗑️ Deleted {vector_result.deleted_count} HNSW vector chunks for config_id: {config_id}")
-            
-            # Also clean up old vector_collection if it exists (backward compatibility)
-            try:
-                old_vector_collection = db['vector_collection']
-                old_vector_result = old_vector_collection.delete_many({"config_id": config_id})
-                if old_vector_result.deleted_count > 0:
-                    current_app.logger.info(f"🗑️ Deleted {old_vector_result.deleted_count} old vector chunks for config_id: {config_id}")
-            except Exception:
-                pass  # Old collection might not exist
+            # 1. Delete the entire dedicated vector collection for this assistant
+            vectors_deleted_count = 0
+            if collection_name:
+                if collection_name in db.list_collection_names():
+                    # To count the documents before dropping, we can do a quick count
+                    vectors_deleted_count = db[collection_name].count_documents({})
+                    db.drop_collection(collection_name)
+                    current_app.logger.info(f"🗑️ Dropped entire collection '{collection_name}' (containing {vectors_deleted_count} vectors) for config_id: {config_id}")
+                else:
+                    current_app.logger.warning(f"⚠️ Collection '{collection_name}' not found for config_id: {config_id}, skipping drop.")
+            else:
+                current_app.logger.warning(f"⚠️ No collection_name found in config for config_id: {config_id}, cannot delete vector collection.")
 
             # 2. Find all chat sessions associated with this config_id
             metadata_collection = db['chat_session_metadata']
@@ -149,12 +151,11 @@ def delete_config(config_id):
                 current_app.logger.info(f"🗑️ Deleted {chat_sessions_deleted} chat session metadata entries for config_id: {config_id}")
             
             # 5. Log cleanup summary
-            total_deleted = vector_result.deleted_count + chat_messages_deleted + chat_sessions_deleted
+            total_deleted = vectors_deleted_count + chat_messages_deleted + chat_sessions_deleted
             current_app.logger.info(f"✅ Cleanup complete for config_id {config_id}: "
-                                   f"{vector_result.deleted_count} vectors, "
+                                   f"{vectors_deleted_count} vectors, "
                                    f"{chat_messages_deleted} messages, "
-                                   f"{chat_sessions_deleted} sessions "
-                                   f"(Total: {total_deleted} items deleted)")
+                                   f"{chat_sessions_deleted} sessions (Total: {total_deleted} items deleted)")
 
         except Exception as e:
             current_app.logger.error(f"❌ Error during cascading delete for config_id '{config_id}': {e}", exc_info=True)
@@ -165,10 +166,10 @@ def delete_config(config_id):
             }), 200
 
         return jsonify({
-            "message": "Configuration and all associated data deleted successfully",
+            "message": f"Configuration {config_id} and associated data deleted successfully.",
             "details": {
-                "config_deleted": True,
-                "vectors_deleted": vector_result.deleted_count,
+                "config_id_deleted": config_id,
+                "vectors_deleted": vectors_deleted_count,
                 "chat_messages_deleted": chat_messages_deleted,
                 "chat_sessions_deleted": chat_sessions_deleted
             }

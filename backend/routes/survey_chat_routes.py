@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request
 from bson import ObjectId
 import logging
+import pymongo
 import time
 from models.config import Config
 from langchain_openai import ChatOpenAI
@@ -109,37 +110,49 @@ def survey_chat(config_id, chat_id):
             llm = ChatOpenAI(model_name=llm_type, temperature=temperature)
 
         # --- Dynamic Prompt Creation ---
-        prompt_template_str = config_document.get('prompt_template')
         instructions = config_document.get('instructions')
+        use_advanced_template = config_document.get('use_advanced_template', False)
 
-        if prompt_template_str:
-            logger.info("Using advanced prompt template for survey chat.")
+        if use_advanced_template:
+            logger.info("Using hard-coded advanced template for survey chat.")
+            # Hard-coded advanced template for document-focused surveys
+            advanced_template = (
+                "You are a professional survey conductor. Your job is to ask survey questions ONLY from the provided context documents.\n"
+                "IMPORTANT INSTRUCTIONS:\n"
+                "1. The context contains survey questions, forms, or questionnaires from uploaded documents\n"
+                "2. You MUST extract specific questions from the context and ask them one by one\n"
+                "3. If this is the first interaction, look at the context and ask the FIRST question you find\n"
+                "4. After the user answers, ask the NEXT question from the context\n"
+                "5. Do NOT make up questions - only use questions that appear in the context\n"
+                "6. If no specific questions are in the context, ask the user to describe what they want to be surveyed about based on the context\n\n"
+                "Context from uploaded documents:\n{context}\n\n"
+                "Remember: Extract and ask specific questions from the context above. Do not create your own questions."
+            )
             prompt = ChatPromptTemplate.from_messages([
-                ('system', prompt_template_str),
+                ('system', advanced_template),
                 MessagesPlaceholder(variable_name="history"),
                 ('human', '{question}'),
             ])
         elif instructions:
             logger.info("Using instructions for survey chat.")
+            enhanced_instructions = (
+                f"{instructions}\n\n"
+                "IMPORTANT: You must ask survey questions based on the provided context documents.\n"
+                "1. Look at the context below and extract specific questions from the uploaded documents\n"
+                "2. Ask questions one by one from the context, do not make up your own questions\n"
+                "3. If this is the first interaction, start with the first question from the context\n"
+                "4. After the user answers, ask the next question from the context\n\n"
+                "Context from uploaded documents:\n{{context}}\n\n"
+                "Remember: Use the context above to ask specific survey questions from the documents."
+            )
             prompt = ChatPromptTemplate.from_messages([
-                ('system', f"{instructions}\n\nContext:\n{{context}}"),
+                ('system', enhanced_instructions),
                 MessagesPlaceholder(variable_name="history"),
                 ('human', '{{question}}'),
             ])
         else:
-            logger.info("Using default prompt for survey chat.")
-            prompt = ChatPromptTemplate.from_messages([
-                ("system", (
-                    "You are a professional and engaging survey conductor. Your primary role is to guide the user through a survey based on the provided context.\n"
-                    "The context contains the survey questions and related information. You must use this context to ask questions, clarify user responses, and guide the conversation.\n"
-                    "If the user's answer is unclear or too short, gently ask for more detail. If the user asks a question, answer it concisely using the context before returning to the survey.\n"
-                    "Maintain a polite, encouraging, and neutral tone throughout the survey. Your goal is to collect complete and accurate information from the user.\n"
-                    "If this is the first turn, start with the first question from the context. Otherwise, continue the survey based on the chat history.\n"
-                    "Context:\n{context}"
-                )),
-                MessagesPlaceholder(variable_name="history"),
-                ("human", "{question}"),
-            ])
+            logger.error("No prompt template or instructions provided for survey chat.")
+            return jsonify({"error": "Survey configuration must include either instructions or use advanced template"}), 400
 
         # --- Vector Store Setup ---
         logger.info(f"🔍 Setting up vector store for survey...")
@@ -166,7 +179,10 @@ def survey_chat(config_id, chat_id):
             try:
                 collection_name = config_document.get('collection_name', 'default_collection')
                 index_name = "hnsw_index"
-                collection = current_app.db[collection_name]
+                # Create MongoDB connection and get collection
+                mongo_client = pymongo.MongoClient(current_app.config["MONGO_URI"], serverSelectionTimeoutMS=5000)
+                db = mongo_client[current_app.config["MONGO_DB_NAME"]]
+                collection = db[collection_name]
                 embeddings = current_app.config['EMBEDDINGS']
 
                 vector_store = MongoDBAtlasVectorSearch(
@@ -179,10 +195,10 @@ def survey_chat(config_id, chat_id):
                 search_filter = {"config_id": config_id}
                 logger.info(f"🔍 Performing HNSW search in collection '{collection_name}' with filter: {search_filter}")
 
-                # Perform the search
+                # Perform the search with correct filter format
                 retriever = vector_store.as_retriever(
                     search_type="similarity",
-                    search_kwargs={"k": 3, "pre_filter": {"term": {"query": config_id, "path": "config_id"}}}
+                    search_kwargs={"k": 3, "pre_filter": {"config_id": {"$eq": config_id}}}
                 )
                 
                 docs = retriever.get_relevant_documents(query)
@@ -191,6 +207,7 @@ def survey_chat(config_id, chat_id):
 
             except Exception as e:
                 logger.error(f"❌ HNSW search failed: {str(e)}", exc_info=True)
+                logger.info(f"🔄 Survey will continue without vector context for collection '{collection_name}'")
                 return []
 
         def format_docs(docs):
