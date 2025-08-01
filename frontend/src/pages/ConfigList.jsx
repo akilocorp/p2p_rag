@@ -38,7 +38,10 @@ const ConfigItem = ({ config, onSelect, onEdit }) => {
               </div>
             )}
             <span className="px-2 py-1 text-xs rounded-full bg-gray-700/50 text-gray-300">
-              {config.temperature ? `Temp: ${config.temperature}` : 'Default temp'}
+              {config.config_type === 'survey' 
+                ? (config.creativity_rate ? `Creativity: ${config.creativity_rate}/5` : 'Creativity: 3/5')
+                : (config.temperature ? `Temp: ${config.temperature}` : 'Default temp')
+              }
             </span>
           </div>
         </div>

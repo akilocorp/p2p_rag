@@ -153,6 +153,7 @@ const ConfigPage = () => {
     // Basic validation
     const newErrors = {};
     if (!config.bot_name.trim()) newErrors.bot_name = 'Chatbot name is required';
+    if (!config.collection_name.trim()) newErrors.collection_name = 'Collection name is required';
     if (promptMode === 'instructions' && !config.instructions.trim()) {
       newErrors.instructions = 'Instructions are required';
     }
@@ -423,7 +424,7 @@ const ConfigPage = () => {
             <div>
               <label htmlFor="collection_name" className="block text-sm font-medium text-gray-300 mb-2">
                 Collection Name
-                <span className="text-xs text-gray-400 ml-2">(Optional)</span>
+                <span className="text-xs text-red-400 ml-2">*</span>
               </label>
               <input
                 id="collection_name"
@@ -433,10 +434,12 @@ const ConfigPage = () => {
                 onChange={handleChange}
                 className="w-full px-4 py-3 text-white bg-gray-700/70 border border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 placeholder="e.g., company-docs-2024"
+                required
               />
               <p className="mt-1 text-xs text-gray-400">
-                Name your knowledge base for easy reference. Leave blank to auto-generate.
+                Required: Unique name for your knowledge base collection in the database.
               </p>
+              {errors.collection_name && <p className="mt-1 text-sm text-red-400">{errors.collection_name}</p>}
             </div>
 
             <div className="flex flex-col sm:flex-row items-center gap-4 pt-4">

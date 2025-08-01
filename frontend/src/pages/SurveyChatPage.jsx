@@ -257,11 +257,10 @@ const SurveyChatPage = () => {
           isAuthenticated={isAuthenticated}
           currentChatId={currentChatId}
           onNewChat={() => navigate(`/survey-chat/${config_id}`)}
-          isSidebarCollapsed={isSidebarCollapsed}
-          setIsSidebarCollapsed={setIsSidebarCollapsed}
-          showSidebar={showSidebar}
-          setShowSidebar={setShowSidebar}
-          isLoading={sessionsLoading}
+          isCollapsed={isSidebarCollapsed}
+          onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          onClose={() => setShowSidebar(false)}
+          sessionsLoading={sessionsLoading}
           chatType="survey"
         />
       )}

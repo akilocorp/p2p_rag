@@ -329,31 +329,33 @@ const EditConfigPage = () => {
               </label>
             </div>
 
-            {/* Temperature */}
-            <div>
-              <label htmlFor="temperature" className="block text-sm font-medium text-gray-300 mb-2">
-                Temperature
-                <span className="text-xs text-gray-400 ml-2">
-                  ({config.temperature < 0.3 ? 'Precise' : config.temperature < 0.7 ? 'Balanced' : 'Creative'})
-                </span>
-              </label>
-              <input
-                id="temperature"
-                type="range"
-                name="temperature"
-                min="0"
-                max="1"
-                step="0.1"
-                value={config.temperature}
-                onChange={handleChange}
-                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-              />
-              <div className="flex justify-between text-xs text-gray-400 mt-1">
-                <span>Precise</span>
-                <span>Balanced</span>
-                <span>Creative</span>
+            {/* Temperature - Only for Normal Configs (Survey configs use Creativity Rate) */}
+            {config.config_type !== 'survey' && (
+              <div>
+                <label htmlFor="temperature" className="block text-sm font-medium text-gray-300 mb-2">
+                  Temperature
+                  <span className="text-xs text-gray-400 ml-2">
+                    ({config.temperature < 0.3 ? 'Precise' : config.temperature < 0.7 ? 'Balanced' : 'Creative'})
+                  </span>
+                </label>
+                <input
+                  id="temperature"
+                  type="range"
+                  name="temperature"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={config.temperature}
+                  onChange={handleChange}
+                  className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                />
+                <div className="flex justify-between text-xs text-gray-400 mt-1">
+                  <span>Precise</span>
+                  <span>Balanced</span>
+                  <span>Creative</span>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Config Type Specific Fields */}
             {config.config_type === 'survey' ? (
@@ -432,32 +434,22 @@ const EditConfigPage = () => {
 
                       {/* Creativity Rate */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Creativity Rate
-                          <span className="text-xs text-gray-400 ml-2">
-                            ({config.creativity_rate === 1 ? 'Very Conservative' : 
-                              config.creativity_rate === 2 ? 'Conservative' :
-                              config.creativity_rate === 3 ? 'Moderate' :
-                              config.creativity_rate === 4 ? 'Creative' : 'Very Creative'})
-                          </span>
+                        <label htmlFor="creativity_rate" className="block text-sm font-medium text-gray-300 mb-2">
+                          Creativity Rate (1-5)
                         </label>
-                        <input
-                          type="range"
+                        <select
+                          id="creativity_rate"
                           name="creativity_rate"
-                          min="1"
-                          max="5"
-                          step="1"
                           value={config.creativity_rate}
                           onChange={handleChange}
-                          className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                        />
-                        <div className="flex justify-between text-xs text-gray-400 mt-1">
-                          <span>1</span>
-                          <span>2</span>
-                          <span>3</span>
-                          <span>4</span>
-                          <span>5</span>
-                        </div>
+                          className="w-full px-4 py-3 text-white bg-gray-700/70 border border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                          <option value={1}>1 - Strict (Ask questions exactly as provided)</option>
+                          <option value={2}>2 - Slightly Flexible (Minor rephrasing)</option>
+                          <option value={3}>3 - Moderate (Conversational adaptation)</option>
+                          <option value={4}>4 - Creative (Reorder and adapt questions)</option>
+                          <option value={5}>5 - Highly Creative (Generate follow-up questions)</option>
+                        </select>
                       </div>
                     </div>
                   )}
