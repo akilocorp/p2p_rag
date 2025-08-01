@@ -70,9 +70,18 @@ const SurveyChatPage = () => {
   const inputRef = useRef(null);
   const isAuthenticated = !!localStorage.getItem('jwtToken');
 
+  // Sync currentChatId with URL parameter
+  useEffect(() => {
+    setCurrentChatId(chat_id);
+  }, [chat_id]);
+
   useEffect(() => {
     const initializeOrLoadChat = async () => {
       setIsInitializing(true);
+      // Clear messages when switching chats
+      setMessages([]);
+      setError(null);
+      
       try {
         const token = localStorage.getItem('jwtToken');
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
@@ -81,7 +90,7 @@ const SurveyChatPage = () => {
                 const configResponse = await apiClient.get(`/survey_config/${config_id}`, { headers });
         setConfig(configResponse.data.config);
 
-        if (currentChatId && messages.length === 0) { // Load existing chat history
+        if (currentChatId) { // Load existing chat history
           const historyResponse = await apiClient.get(`/history/${currentChatId}`, { headers });
           const formattedMessages = historyResponse.data.history.map(msg => ({
             text: msg.data.content,
@@ -140,6 +149,30 @@ const SurveyChatPage = () => {
   }, [config_id, currentChatId, navigate]);
 
   useEffect(() => {
+    // Only fetch sessions if user is authenticated
+    if (!isAuthenticated) {
+      setSessionsLoading(false);
+      return;
+    }
+
+    const fetchSessions = async () => {
+      if (!config_id) return;
+      setSessionsLoading(true);
+      try {
+        // Use survey-specific endpoint for sessions
+        const response = await apiClient.get(`/survey-chat/list/${config_id}`);
+        setSessions(response.data.sessions || []);
+      } catch (error) {
+        console.error("Failed to fetch survey sessions:", error);
+        setSessions([]);
+      } finally {
+        setSessionsLoading(false);
+      }
+    };
+    fetchSessions();
+  }, [config_id, messages, isAuthenticated]);
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
@@ -176,6 +209,7 @@ const SurveyChatPage = () => {
     <div className="flex h-screen bg-gray-900 text-white font-sans">
       <ChatSidebar
         config={config}
+        configId={config_id}
         sessions={sessions}
         userInfo={userInfo}
         userInfoLoaded={userInfoLoaded}

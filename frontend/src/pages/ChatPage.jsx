@@ -269,6 +269,7 @@ const ChatPage = () => {
           userInfo={userInfo}
           userInfoLoaded={userInfoLoaded}
           configId={configId} 
+          currentChatId={chatId}
           isCollapsed={isSidebarCollapsed}
           onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           onClose={() => setShowSidebar(false)}
@@ -289,6 +290,7 @@ const ChatPage = () => {
               userInfo={userInfo}
               userInfoLoaded={userInfoLoaded}
               configId={configId} 
+              currentChatId={chatId}
               isCollapsed={false}
               onClose={() => setShowSidebar(false)}
               onNewChat={handleNewChat}

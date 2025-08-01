@@ -27,9 +27,13 @@ export const ChatSidebar = ({
   onClose, 
   onToggle,
   onNewChat,
-  isPublic
+  isPublic,
+  chatType = 'normal',  // 'normal' or 'survey'
+  currentChatId  // Active chat ID passed from parent
 }) => {
-  const { chatId: activeChatId } = useParams();
+  const { chatId: urlChatId } = useParams();
+  // Use currentChatId prop if available, otherwise fall back to URL parameter
+  const activeChatId = currentChatId || urlChatId;
   const navigate = useNavigate();
   const [openDropdown, setOpenDropdown] = useState(null);
 
@@ -50,7 +54,8 @@ export const ChatSidebar = ({
       e.preventDefault();
       onNewChat();
       setTimeout(() => {
-        window.location.href = `/chat/${configId}`;
+        const newChatUrl = chatType === 'survey' ? `/survey-chat/${configId}` : `/chat/${configId}`;
+        window.location.href = newChatUrl;
       }, 0);
     }
   };
@@ -101,7 +106,7 @@ export const ChatSidebar = ({
     {
       icon: <FiPlus className="w-5 h-5" />,
       text: 'New Chat',
-      link: `/chat/${configId}`,
+      link: chatType === 'survey' ? `/survey-chat/${configId}` : `/chat/${configId}`,
       active: activeChatId === undefined,
       onClick: handleNewChatClick
     },
@@ -208,7 +213,7 @@ export const ChatSidebar = ({
                   sessions.map((session) => (
                     <div key={session.session_id} className="relative">
                       <Link
-                        to={`/chat/${configId}/${session.session_id}`}
+                        to={chatType === 'survey' ? `/survey-chat/${configId}/${session.session_id}` : `/chat/${configId}/${session.session_id}`}
                         className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all ${
                           activeChatId === session.session_id 
                             ? 'bg-gray-700/70 border border-gray-600/50'

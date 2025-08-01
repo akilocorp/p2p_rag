@@ -303,3 +303,93 @@ def survey_chat(config_id, chat_id):
             "error": "Internal server error",
             "message": "An unexpected error occurred while processing your survey request."
         }), 500
+
+@survey_chat_bp.route('/survey-chat/list/<string:config_id>', methods=['GET'])
+@jwt_required()
+def get_survey_chat_list(config_id):
+    """Get list of survey chat sessions for a specific config.
+    Survey chats start with AI messages, unlike normal chats that start with human messages.
+    """
+    try:
+        user_id = get_jwt_identity()
+        db = current_app.config['MONGO_DB']
+        metadata_collection = db["chat_session_metadata"]
+
+        # Pipeline to get survey chat sessions - looks for AI messages first
+        pipeline = [
+            {
+                '$match': {
+                    '$or': [
+                        {'user_id': user_id},
+                        {'user_id': "anonymous"}
+                    ],
+                    'config_id': config_id
+                }
+            },
+            {'$sort': {'_id': -1}},
+           
+            {
+                '$lookup': {
+                    'from': 'message_store',
+                    'let': {'session_id_str': '$session_id'},
+                    'pipeline': [
+                        {'$match': {'$expr': {'$eq': ['$SessionId', '$$session_id_str']}}},
+                        {'$sort': {'_id': 1}},
+                        {'$limit': 1},  # Get first message (AI in survey chat)
+                        {'$project': {'History': 1, '_id': 0}}
+                    ],
+                    'as': 'first_message_info'
+                }
+            },
+            {
+                '$project': {
+                    '_id': 1,
+                    'session_id': '$session_id',
+                    'user_id': '$user_id',
+                    'timestamp': {'$dateToString': {'format': '%Y-%m-%dT%H:%M:%S.%LZ', 'date': '$_id'}},
+                    'first_message_history': {'$arrayElemAt': ['$first_message_info.History', 0]}
+                }
+            }
+        ]
+
+        sessions_from_db = list(metadata_collection.aggregate(pipeline))
+        
+        sessions_list = []
+        for session in sessions_from_db:
+            
+            # Claim anonymous chats for current user
+            if session.get('user_id') == 'anonymous':
+                metadata_collection.update_one(
+                    {"_id": session["_id"]},
+                    {"$set": {"user_id": user_id}}
+                )
+                logger.info(f"✅ Claimed anonymous survey chat {session['session_id']} for user {user_id}")
+
+            # Create title from first AI message (survey question)
+            title = "Survey Chat"
+            try:
+                if session.get('first_message_history'):
+                    import json
+                    history_data = json.loads(session['first_message_history'])
+                    # In survey chat, first message is from AI
+                    if history_data.get("data", {}).get("content"):
+                        ai_message = history_data["data"]["content"]
+                        # Use first 50 chars of AI's first question as title
+                        title = ai_message[:50] + ("..." if len(ai_message) > 50 else "")
+                        # Clean up title (remove newlines, extra spaces)
+                        title = ' '.join(title.split())
+            except Exception as e:
+                logger.warning(f"Could not parse survey chat title: {e}")
+
+            sessions_list.append({
+                "session_id": session["session_id"],
+                "title": title,
+                "timestamp": session["timestamp"]
+            })
+
+        logger.info(f"📋 Retrieved {len(sessions_list)} survey chat sessions for config {config_id}")
+        return jsonify({"sessions": sessions_list}), 200
+
+    except Exception as e:
+        logger.error(f"❌ Error fetching survey chat sessions: {str(e)}", exc_info=True)
+        return jsonify({"message": "Failed to fetch survey chat sessions"}), 500
