@@ -313,7 +313,7 @@ const SurveyConfigPage = () => {
                     value={config.instructions}
                     onChange={handleChange}
                     className="w-full px-4 py-3 text-white bg-gray-700/70 border border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    placeholder="e.g., You are a helpful assistant. Respond to user queries based on the provided context."
+                    placeholder="Example: You are a friendly survey bot. Ask questions from uploaded documents one at a time. Use ONLY questions from the context: {context}. Ask ALL questions systematically. After completion, provide a summary report with all questions and answers."
                   />
                   {errors.instructions && <p className="mt-1 text-sm text-red-400">{errors.instructions}</p>}
                 </div>

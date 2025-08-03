@@ -337,7 +337,7 @@ const SurveyChatPage = () => {
           chatType="survey"
         />
       )}
-      <div className={`flex-1 flex flex-col transition-all duration-300 ${
+      <div className={`relative flex-1 flex flex-col transition-all duration-300 ${
         isAuthenticated && !isSidebarCollapsed ? 'md:ml-72' : 'md:ml-0'
       }`}>
         {isInitializing && (

@@ -412,7 +412,7 @@ const EditConfigPage = () => {
                       onChange={handleChange}
                       rows="4"
                       className="w-full px-4 py-2 mt-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                      placeholder="Enter instructions for the survey bot..."
+                      placeholder="You are a friendly survey bot. Ask questions from uploaded documents one at a time. Use ONLY questions from the context: {context}. Ask ALL questions systematically. After completion, provide a summary report with all questions and answers."
                     />
                   )}
 
@@ -516,7 +516,7 @@ const EditConfigPage = () => {
                       onChange={handleChange}
                       rows="5"
                       className="w-full px-4 py-3 text-white bg-gray-700/70 border border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      placeholder="Example: You are a helpful customer support assistant for a tech company. Be polite and professional in your responses."
+                      placeholder="Example: You are a helpful AI assistant. Your goal is to answer questions accurately based on the context provided."
                     />
                     {errors.instructions && (
                       <p className="mt-1 text-sm text-red-400">{errors.instructions}</p>
