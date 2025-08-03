@@ -3,6 +3,8 @@ from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_req
 from bson import ObjectId
 import logging
 import pymongo
+import re
+import json
 import time
 from models.config import Config
 from langchain_openai import ChatOpenAI
@@ -50,23 +52,16 @@ def init_survey_chat(config_id):
         bot_name = config_document.get('bot_name', 'your assistant')
         use_advanced_template = config_document.get('use_advanced_template', False)
         
-        # Generate personalized welcome message
-        if use_advanced_template:
-            survey_purpose = config_document.get('survey_purpose', 'gathering feedback')
-            target_audience = config_document.get('target_audience', 'general users')
-            welcome_message = (
-                f"Hello! I'm {bot_name}, your interactive survey assistant. "
-                f"I'm here to help with {survey_purpose} from our {target_audience}. "
-                f"This survey is designed to gather valuable insights through a conversational approach. "
-                f"Would you like to begin? I'll guide you through each question step by step."
-            )
-        else:
-            welcome_message = f"Hello, I am {bot_name}. I'm here to conduct a survey. Would you like to begin?"
-
+        # Create smart hardcoded greeting that works for both template types
         chat_id = str(ObjectId())
+        
+        # Generate simple hardcoded greeting for both template types
+        welcome_message = f"Hello! I'm {bot_name}. I'm here to conduct a survey with you. Would you like to begin?"
+        
+        # Save the greeting to chat history
         history = get_session_history(chat_id, user_id, config_id)
         history.add_message(AIMessage(content=welcome_message))
-
+        
         return jsonify({"response": welcome_message, "chat_id": chat_id}), 200
 
     except Exception as e:
@@ -138,41 +133,28 @@ def survey_chat(config_id, chat_id):
             
             # Comprehensive survey AI bot template
             advanced_template = (
-                f"You are a professional and interactive survey AI bot named '{bot_name}'. Your primary objective is to engage users in a conversational survey to gather meaningful insights and fulfill the core purpose of the survey.\n\n"
-                f"You have been given the following core inputs:\n\n"
-                f"* Survey Purpose: {survey_purpose}\n"
-                f"* Target Audience: {target_audience}\n"
-                f"* Creativity Rate (1-5): {creativity_rate}\n"
-                f"* Survey Questions: {survey_questions}\n\n"
-                f"### Interaction Instructions:\n\n"
-                f"1.  Initiating the Survey:\n"
-                f"    * You must initiate the conversation. Your first message should introduce yourself, state the survey's purpose in a friendly manner, and explicitly ask for the user's consent to begin. You must wait for their consent before proceeding.\n"
-                f"    * Example opening: \"Hello! I'm here to gather your thoughts on {survey_purpose}. Would you be willing to participate?\"\n\n"
-                f"2.  Question Adaptation & Flow:\n"
-                f"    * Adapt your questioning based on the {creativity_rate}:\n"
-                f"        * Rate 1: Ask questions exactly as retrieved, in their given order.\n"
-                f"        * Rate 2-3: Rephrase questions to be more conversational and natural for the {target_audience}. You may subtly reorder questions for better flow.\n"
-                f"        * Rate 4-5: You have creative freedom. Alter question phrasing, introduce new follow-up questions to dig deeper, and reorder questions as needed to satisfy the {survey_purpose}. You can generate new questions that build on previous answers.\n"
-                f"    * Always build on the user's previous answers to maintain a natural, interactive flow.\n\n"
-                f"3.  Dynamic Question Format Detection & Handling:\n"
-                f"    * Automatically detect question types from the context and format appropriately:\n"
-                f"        * **Multiple Choice**: If you see options like 'A) B) C) D)', '1) 2) 3) 4)', or bullet points → Present as numbered list and ask user to select by number\n"
-                f"        * **Scale Questions**: If you see scales like '1-5', 'Strongly Disagree to Strongly Agree', rating scales → Present the full scale and ask for rating\n"
-                f"        * **Open-Ended**: If question asks 'explain', 'describe', 'why', 'how', or has no predefined options → Ask for detailed text response\n"
-                f"        * **Yes/No**: If question is binary → Present as 'Please answer Yes or No'\n"
-                f"        * **Ranking**: If question asks to rank items → Present items and ask to rank in order\n"
-                f"    * Always format options clearly and specify exactly how the user should respond\n"
-                f"    * Example formats:\n"
-                f"        - Multiple Choice: 'Please select one: 1) Option A, 2) Option B, 3) Option C'\n"
-                f"        - Scale: 'Please rate from 1 (Poor) to 5 (Excellent)'\n"
-                f"        - Open-ended: 'Please provide your detailed thoughts on...'\n\n"
-                f"4.  Concluding the Survey:\n"
-                f"    * Once the {survey_purpose} is fulfilled, thank the user for their time.\n"
-                f"    * If the user requests to stop, gracefully end the survey and thank them for their responses so far.\n\n"
-                f"### Conversation Context:\n\n"
-                f"Based on the context below from uploaded documents, use it to inform your survey questions:\n"
-                f"Context: {{context}}\n\n"
-                f"Now, please take on your role as the survey bot and provide the next response. Remember, your first task is to ask for consent."
+                f"You are {bot_name}, a professional survey conductor. Your role is to conduct a comprehensive survey based on the questions provided in the context.\n\n"
+                f"**SURVEY CONTEXT:**\n"
+                f"- Survey Purpose: {survey_purpose}\n"
+                f"- Target Audience: {target_audience}\n"
+                f"- Creativity Level: {creativity_rate}/5 (1=strict, 5=highly creative)\n\n"
+                f"**SURVEY BEHAVIOR INSTRUCTIONS:**\n"
+                f"1. **Question Source**: Use ONLY the questions from the uploaded documents in the context below. Do NOT create your own questions.\n"
+                f"2. **Systematic Coverage**: Ask ALL questions from the context systematically. Keep track of which questions you have asked.\n"
+                f"3. **One Question at a Time**: Present one question at a time and wait for the user's response before proceeding.\n"
+                f"4. **Question Format**: Present questions exactly as they appear in the context, including all answer choices if provided.\n"
+                f"5. **Audience Adaptation**: Adapt your language and tone to suit the {target_audience} audience.\n"
+                f"6. **Creativity Application**: Apply creativity level {creativity_rate}/5 to your question presentation style:\n"
+                f"   - Level 1-2: Direct, formal presentation\n"
+                f"   - Level 3-4: Friendly, conversational approach\n"
+                f"   - Level 5: Engaging, creative question delivery\n"
+                f"7. **Progress Tracking**: Keep mental track of survey progress and inform users of their progress occasionally.\n"
+                f"8. **Final Report**: After all questions are completed, provide a comprehensive summary report listing all questions asked and the user's responses.\n"
+                f"9. **Early Completion**: If the user wants to stop early, provide a partial report of questions asked so far.\n\n"
+                f"**IMPORTANT**: Your responses will be automatically converted to interactive format. Simply present the questions naturally - the system will handle the interactive elements.\n\n"
+                f"**CONTEXT WITH SURVEY QUESTIONS:**\n"
+                f"{{context}}\n\n"
+                f"Present the next appropriate survey question or provide a summary report if the survey is complete. Remember to maintain the appropriate creativity level and audience focus."
             )
             prompt = ChatPromptTemplate.from_messages([
                 ('system', advanced_template),
@@ -183,13 +165,29 @@ def survey_chat(config_id, chat_id):
             logger.info("Using instructions for survey chat.")
             enhanced_instructions = (
                 f"{instructions}\n\n"
-                "IMPORTANT: You must ask survey questions based on the provided context documents.\n"
-                "1. Look at the context below and extract specific questions from the uploaded documents\n"
-                "2. Ask questions one by one from the context, do not make up your own questions\n"
-                "3. If this is the first interaction, start with the first question from the context\n"
-                "4. After the user answers, ask the next question from the context\n\n"
+                "=== SURVEY CHAT BEHAVIOR ===\n"
+                "You are conducting a comprehensive survey. Follow these critical rules:\n\n"
+                "QUESTION TRACKING & SYSTEMATIC COVERAGE:\n"
+                "* You MUST use ALL the exact questions provided in the context below from the uploaded survey documents.\n"
+                "* DO NOT create your own questions. Only use questions that appear in the context.\n"
+                "* Work through questions systematically - keep mental track of which questions you've asked.\n"
+                "* Do NOT end the survey until you have asked EVERY question from the context.\n"
+                "* If you're unsure if you've asked all questions, continue asking until you've covered everything.\n\n"
+                "FINAL SURVEY REPORT:\n"
+                "* Once ALL questions have been asked, provide a comprehensive summary report.\n"
+                "* The final report should list every question asked and the user's answer.\n"
+                "* Format the final report as regular text with clear structure.\n"
+                "* Example final report format:\n"
+                "  'Thank you for completing the survey! Here's a summary of your responses:\n\n"
+                "  Question 1: [question text]\n"
+                "  Your answer: [user's answer]\n\n"
+                "  Question 2: [question text]\n"
+                "  Your answer: [user's answer]\n\n"
+                "  ... (continue for all questions)'\n"
+                "* If the user requests to stop early, provide a partial report of questions answered so far.\n\n"
+                "IMPORTANT: Your responses will be automatically converted to interactive format. Simply present the questions naturally - the system will handle the interactive elements.\n\n"
                 "Context from uploaded documents:\n{{context}}\n\n"
-                "Remember: Use the context above to ask specific survey questions from the documents."
+                "CRITICAL: Only ask questions that appear in the context above. Work through ALL questions systematically."
             )
             prompt = ChatPromptTemplate.from_messages([
                 ('system', enhanced_instructions),
@@ -241,14 +239,29 @@ def survey_chat(config_id, chat_id):
                 search_filter = {"config_id": config_id}
                 logger.info(f"🔍 Performing HNSW search in collection '{collection_name}' with filter: {search_filter}")
 
-                # Perform the search with correct filter format
+                # First, count ALL documents for this config to determine k dynamically
+                total_docs = collection.count_documents({"config_id": config_id})
+                logger.info(f"📊 Found {total_docs} total documents for config {config_id}")
+                
+                # Use the total count as k to retrieve ALL documents for this survey
+                # Add buffer of +10 in case of any edge cases
+                k_value = max(total_docs + 10, 20)  # Minimum 20, but scale up as needed
+                logger.info(f"🎯 Setting k={k_value} to retrieve all survey questions")
+
+                # Perform the search with dynamic k value
                 retriever = vector_store.as_retriever(
                     search_type="similarity",
-                    search_kwargs={"k": 3, "pre_filter": {"config_id": {"$eq": config_id}}}
+                    search_kwargs={"k": k_value, "pre_filter": {"config_id": {"$eq": config_id}}}
                 )
                 
-                docs = retriever.get_relevant_documents(query)
+                docs = retriever.invoke(query)
                 logger.info(f"✅ HNSW search completed. Found {len(docs)} documents.")
+                
+                # Log the content of retrieved documents for debugging
+                for i, doc in enumerate(docs):
+                    content_preview = doc.page_content[:200].replace('\n', ' ') if doc.page_content else '(empty)'
+                    logger.info(f"📝 Document {i+1}: {content_preview}{'...' if len(doc.page_content) > 200 else ''}")
+                
                 return docs
 
             except Exception as e:
@@ -257,17 +270,25 @@ def survey_chat(config_id, chat_id):
                 return []
 
         def format_docs(docs):
-            """Format retrieved documents into context for the survey LLM."""
+            """Format retrieved documents into context for the survey LLM with better structure."""
             if not docs:
                 logger.warning("⚠️ No documents to format - empty context will be sent to LLM")
                 return ""
             
-            context = "\n\n".join(doc.page_content for doc in docs)
+            # Format with clear numbering and separators to help AI track progress
+            formatted_chunks = []
+            for i, doc in enumerate(docs, 1):
+                chunk_content = f"=== DOCUMENT CHUNK {i} ===\n{doc.page_content}\n=== END CHUNK {i} ==="
+                formatted_chunks.append(chunk_content)
+            
+            context = "\n\n".join(formatted_chunks)
+            context = f"TOTAL DOCUMENT CHUNKS: {len(docs)}\n\n{context}\n\nREMINDER: You must work through ALL {len(docs)} chunks systematically to ensure no questions are missed."
+            
             logger.info(f"📝 Formatted survey context: {len(docs)} docs, {len(context):,} chars")
             
             # Log context preview for debugging
-            preview = context[:200].replace('\n', ' ') if context else "(empty)"
-            logger.debug(f"🔍 Survey context preview: {preview}...")
+            preview = context[:300].replace('\n', ' ') if context else "(empty)"
+            logger.info(f"🔍 Survey context preview: {preview}...")
             
             return context
 
@@ -311,6 +332,206 @@ def survey_chat(config_id, chat_id):
             
             llm_time = time.time() - llm_start
             logger.info(f"✅ Survey response generated in {llm_time:.2f}s ({len(response_content)} chars)")
+
+            # --- Universal Interactive Response Converter ---
+            # Convert ANY survey question to interactive JSON format, regardless of template
+            logger.info(f"🔍 Raw AI response: {response_content[:300]}{'...' if len(response_content) > 300 else ''}")
+            
+            def convert_to_interactive_json(text):
+                """Convert survey questions to interactive JSON format automatically."""
+                import re
+                
+                # If already JSON, return as-is
+                if text.strip().startswith('{') and text.strip().endswith('}'):
+                    try:
+                        json.loads(text)
+                        return text
+                    except:
+                        pass
+                
+                # Detect multiple choice questions
+                mc_pattern = r'(.+?)\?[\s\n]*([A-Z]\)\s*.+?)(?:\n[A-Z]\)\s*.+?)*'
+                if re.search(r'[A-Z]\)\s*', text) and '?' in text:
+                    lines = text.split('\n')
+                    question = ''
+                    options = []
+                    
+                    for line in lines:
+                        line = line.strip()
+                        if '?' in line and not line.startswith(('A)', 'B)', 'C)', 'D)', 'E)', 'F)')):
+                            question = line
+                        elif re.match(r'^[A-Z]\)\s*', line):
+                            option = re.sub(r'^[A-Z]\)\s*', '', line)
+                            options.append(option)
+                    
+                    if question and options:
+                        return json.dumps({
+                            "type": "multiple_choice",
+                            "question": question,
+                            "options": options,
+                            "required": True
+                        })
+                
+                # Detect scale questions (1-5 or 1-10)
+                scale_1_5 = re.search(r'scale.*1.*5|1.*5.*scale|rate.*1.*5|1.*5.*rate', text, re.IGNORECASE)
+                scale_1_10 = re.search(r'scale.*1.*10|1.*10.*scale|rate.*1.*10|1.*10.*rate', text, re.IGNORECASE)
+                
+                if scale_1_5 or scale_1_10:
+                    question_match = re.search(r'(.+?)(?:scale|rate)', text, re.IGNORECASE)
+                    if not question_match:
+                        # Try to find question before scale mention
+                        question_lines = [line.strip() for line in text.split('\n') if '?' in line]
+                        if question_lines:
+                            question = question_lines[0]
+                        else:
+                            question = text.split('\n')[0].strip()
+                    else:
+                        question = question_match.group(1).strip()
+                    
+                    if question:
+                        if scale_1_10:
+                            return json.dumps({
+                                "type": "scale",
+                                "question": question,
+                                "scale_min": 1,
+                                "scale_max": 10,
+                                "scale_labels": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
+                                "required": True
+                            })
+                        else:
+                            return json.dumps({
+                                "type": "scale",
+                                "question": question,
+                                "scale_min": 1,
+                                "scale_max": 5,
+                                "scale_labels": ["1", "2", "3", "4", "5"],
+                                "required": True
+                            })
+                
+                # Detect dropdown questions (education, selection lists)
+                if re.search(r'(education|degree|select|choose)', text, re.IGNORECASE) and '-' in text:
+                    lines = text.split('\n')
+                    question = ''
+                    options = []
+                    
+                    for line in lines:
+                        line = line.strip()
+                        if '?' in line and not line.startswith('-'):
+                            question = line
+                        elif line.startswith('-'):
+                            option = line[1:].strip()
+                            if option:
+                                options.append(option)
+                    
+                    if question and options:
+                        return json.dumps({
+                            "type": "dropdown",
+                            "question": question,
+                            "options": options,
+                            "required": True
+                        })
+                
+                # Detect yes/no questions
+                if re.search(r'\b(yes|no)\b', text, re.IGNORECASE) and '?' in text:
+                    question_lines = [line.strip() for line in text.split('\n') if '?' in line]
+                    if question_lines:
+                        question = question_lines[0]
+                        return json.dumps({
+                            "type": "yes_no",
+                            "question": question,
+                            "required": True
+                        })
+                
+                # Detect multiple select questions (select all that apply)
+                if re.search(r'select all|all that apply|check all', text, re.IGNORECASE) and re.search(r'[A-Z]\)\s*', text):
+                    lines = text.split('\n')
+                    question = ''
+                    options = []
+                    
+                    for line in lines:
+                        line = line.strip()
+                        if '?' in line or 'apply' in line.lower():
+                            question = line
+                        elif re.match(r'^[A-Z]\)\s*', line):
+                            option = re.sub(r'^[A-Z]\)\s*', '', line)
+                            options.append(option)
+                    
+                    if question and options:
+                        return json.dumps({
+                            "type": "multiple_select",
+                            "question": question,
+                            "options": options,
+                            "required": False
+                        })
+                
+                # Detect open-ended questions
+                if '?' in text and ('explain' in text.lower() or 'describe' in text.lower() or 'detail' in text.lower() or 'motivate' in text.lower() or 'change' in text.lower()):
+                    question_lines = [line.strip() for line in text.split('\n') if '?' in line]
+                    if question_lines:
+                        question = question_lines[0]
+                        return json.dumps({
+                            "type": "open_ended",
+                            "question": question,
+                            "placeholder": "Please share your thoughts...",
+                            "required": False
+                        })
+                
+                # Fallback: if it contains a question mark, make it open-ended
+                if '?' in text:
+                    question_lines = [line.strip() for line in text.split('\n') if '?' in line]
+                    if question_lines:
+                        question = question_lines[0]
+                        return json.dumps({
+                            "type": "open_ended",
+                            "question": question,
+                            "placeholder": "Please provide your answer...",
+                            "required": False
+                        })
+                
+                # Default: return original text
+                return text
+            
+            # Convert to interactive format if it's a survey question
+            interactive_response = convert_to_interactive_json(response_content)
+            if interactive_response != response_content:
+                logger.info("✅ Converted survey question to interactive JSON format")
+                response_content = interactive_response
+            else:
+                logger.info("ℹ️ Response kept as original text (not a detectable question format)")
+            
+            # --- Robust JSON Extraction (fallback) ---
+            def extract_json_from_response(text):
+                """Extract the first complete JSON object from a text response."""
+                # Find the first opening brace
+                start_idx = text.find('{')
+                if start_idx == -1:
+                    return None
+                
+                # Count braces to find the matching closing brace
+                brace_count = 0
+                for i, char in enumerate(text[start_idx:], start_idx):
+                    if char == '{':
+                        brace_count += 1
+                    elif char == '}':
+                        brace_count -= 1
+                        if brace_count == 0:
+                            # Found the complete JSON object
+                            return text[start_idx:i+1]
+                return None
+            
+            extracted_json = extract_json_from_response(response_content)
+            logger.info(f"🔍 Extracted JSON: {extracted_json[:200] if extracted_json else 'None'}{'...' if extracted_json and len(extracted_json) > 200 else ''}")
+            
+            if extracted_json:
+                try:
+                    # Validate the extracted string is valid JSON
+                    json.loads(extracted_json)
+                    response_content = extracted_json  # Replace response with clean JSON
+                    logger.info("✅ Extracted and validated JSON from LLM response.")
+                except json.JSONDecodeError:
+                    logger.warning("⚠️ Found a JSON-like object, but it was invalid. Using original response.")
+            else:
+                logger.info("ℹ️ No JSON object found in response, keeping original text.")
             
             # Prepare source information for survey
             sources = []
@@ -323,6 +544,8 @@ def survey_chat(config_id, chat_id):
                 sources.append(source_info)
             
             logger.info(f"📊 Survey interaction completed: {len(docs)} sources, response length: {len(response_content)}")
+            logger.info(f"🔍 Final response content: {response_content[:200]}{'...' if len(response_content) > 200 else ''}")
+            logger.info(f"🔍 JSON extracted flag: {extracted_json is not None}")
             
             return jsonify({
                 "response": response_content,
@@ -331,7 +554,8 @@ def survey_chat(config_id, chat_id):
                     "documents_found": len(docs),
                     "context_length": len(context),
                     "response_time": round(llm_time, 2),
-                    "survey_mode": True
+                    "survey_mode": True,
+                    "json_extracted": extracted_json is not None
                 }
             })
             

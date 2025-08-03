@@ -3,18 +3,22 @@ import React, { useEffect, useRef, useState } from 'react';
 import { RiRobot2Line, RiUser3Line } from 'react-icons/ri';
 import { useNavigate, useParams } from 'react-router-dom';
 import ChatSidebar from '../components/SideBar.jsx';
+import InteractiveSurveyQuestion from '../components/InteractiveSurveyQuestion.jsx';
 import { FaSpinner } from 'react-icons/fa';
 import apiClient from '../api/apiClient';
 import { marked } from 'marked';
 
-const ChatMessage = ({ message }) => {
-  const { sender, text, isTyping } = message;
+const ChatMessage = ({ message, onInteractiveSubmit }) => {
+  const { sender, text, isTyping, questionData } = message;
   const isUser = sender === 'user';
 
   const createMarkup = (markdownText) => {
     const rawMarkup = marked.parse(markdownText || '');
     return { __html: rawMarkup };
   };
+
+  // Check if this is an interactive question from AI
+  const isInteractiveQuestion = !isUser && questionData && typeof questionData === 'object';
 
   return (
     <div className={`flex gap-4 ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -23,24 +27,33 @@ const ChatMessage = ({ message }) => {
           <RiRobot2Line className="text-indigo-400 text-xl" />
         </div>
       )}
-      <div className={`max-w-[80%] rounded-2xl p-4 ${
-        isUser
-          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
-          : 'bg-gray-800/50 backdrop-blur-sm border border-gray-700/50'
-      }`}>
-        {isTyping ? (
-          <div className="flex space-x-2">
-            <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-            <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-            <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '300ms' }} />
-          </div>
-        ) : (
-          <div
-            className="prose prose-invert max-w-none text-gray-100"
-            dangerouslySetInnerHTML={createMarkup(text)}
-          />
-        )}
-      </div>
+      
+      {isInteractiveQuestion ? (
+        <InteractiveSurveyQuestion 
+          questionData={questionData} 
+          onSubmit={onInteractiveSubmit}
+        />
+      ) : (
+        <div className={`max-w-[80%] rounded-2xl p-4 ${
+          isUser
+            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
+            : 'bg-gray-800/50 backdrop-blur-sm border border-gray-700/50'
+        }`}>
+          {isTyping ? (
+            <div className="flex space-x-2">
+              <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          ) : (
+            <div
+              className="prose prose-invert max-w-none text-gray-100"
+              dangerouslySetInnerHTML={createMarkup(text)}
+            />
+          )}
+        </div>
+      )}
+      
       {isUser && (
         <div className="flex-shrink-0 w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center">
           <RiUser3Line className="text-indigo-400 text-xl" />
@@ -127,11 +140,11 @@ const SurveyChatPage = () => {
           }));
           setMessages(formattedMessages);
         } else if (!currentChatId) { // Initialize new survey chat
-                              const response = await apiClient.post(`/survey-chat/${config_id}/init`, {}, { headers });
+          const response = await apiClient.post(`/survey-chat/${config_id}/init`, {}, { headers });
           console.log('🔍 Init response:', response.data);
 
-          const initialMessage = response.data.response || response.data.initial_message;
-          const newChatId = response.data.chat_id || response.data.session_id;
+          const initialMessage = response.data.response;
+          const newChatId = response.data.chat_id;
           console.log('🔍 Parsed data:', { initialMessage, newChatId });
 
           if (initialMessage && newChatId) {
@@ -145,7 +158,7 @@ const SurveyChatPage = () => {
           } else {
             console.error('Failed to initialize chat: Backend response is missing expected keys.', {
               'received_data': response.data,
-              'expected_keys': 'response/initial_message and chat_id/session_id'
+              'expected_keys': 'response and chat_id'
             });
             setError('Failed to start the survey. The server response was invalid.');
           }
@@ -234,9 +247,69 @@ const SurveyChatPage = () => {
         { headers }
       );
 
-      setMessages(prev => [...prev, { text: response.data.response, sender: 'ai' }]);
+      // Try to parse the response as JSON for interactive questions
+      let aiMessage = { text: response.data.response, sender: 'ai' };
+      try {
+        const jsonData = JSON.parse(response.data.response);
+        if (jsonData.type && jsonData.question) {
+          // This is an interactive question
+          aiMessage = {
+            text: '', // No text for interactive questions
+            sender: 'ai',
+            questionData: jsonData
+          };
+        }
+      } catch (e) {
+        // Not JSON, treat as regular text message
+      }
+
+      setMessages(prev => [...prev, aiMessage]);
     } catch (err) {
       console.error('Send message error:', err);
+      setError('Failed to get a response. Please check your connection.');
+      setMessages(prev => prev.slice(0, -1)); // Remove user message on error
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleInteractiveSubmit = async (answer) => {
+    if (isLoading || isInitializing) return;
+
+    // Add user's answer to chat
+    const userMessage = { text: answer, sender: 'user' };
+    setMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const token = localStorage.getItem('jwtToken');
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+      const response = await apiClient.post(`/survey-chat/${config_id}/${currentChatId}`, 
+        { input: answer }, 
+        { headers }
+      );
+
+      // Try to parse the response as JSON for interactive questions
+      let aiMessage = { text: response.data.response, sender: 'ai' };
+      try {
+        const jsonData = JSON.parse(response.data.response);
+        if (jsonData.type && jsonData.question) {
+          // This is an interactive question
+          aiMessage = {
+            text: '', // No text for interactive questions
+            sender: 'ai',
+            questionData: jsonData
+          };
+        }
+      } catch (e) {
+        // Not JSON, treat as regular text message
+      }
+
+      setMessages(prev => [...prev, aiMessage]);
+    } catch (err) {
+      console.error('Interactive submit error:', err);
       setError('Failed to get a response. Please check your connection.');
       setMessages(prev => prev.slice(0, -1)); // Remove user message on error
     } finally {
@@ -294,7 +367,7 @@ const SurveyChatPage = () => {
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 z-0">
           <div className="container mx-auto max-w-4xl space-y-6">
             {messages.map((msg, index) => (
-              <ChatMessage key={index} message={msg} />
+              <ChatMessage key={index} message={msg} onInteractiveSubmit={handleInteractiveSubmit} />
             ))}
 
             {isLoading && (
