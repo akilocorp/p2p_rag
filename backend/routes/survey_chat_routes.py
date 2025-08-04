@@ -202,22 +202,20 @@ def survey_chat(config_id, chat_id):
         logger.info(f"🔍 Setting up vector store for survey...")
         
         db = current_app.config['MONGO_DB']
-        collection_name = config_document.get("collection_name")
-        if not collection_name:
-            logger.error(f"❌ Configuration {config_id} is missing the 'collection_name' field.")
-            return jsonify({"message": "Configuration is missing collection name."}), 400
-
+        # Use single shared collection for all configs (cost-effective for MongoDB Atlas)
+        shared_collection_name = "documents"
+        
         vector_store = MongoDBAtlasVectorSearch(
-            collection=db[collection_name],
+            collection=db[shared_collection_name],
             embedding=current_app.config['EMBEDDINGS'],
             index_name="hnsw_index",
             text_key="text",
             embedding_key="embedding"
         )
         
-        logger.info(f"📊 Initialized HNSW vector store: collection='{collection_name}', index='hnsw_index'")
+        logger.info(f"📊 Initialized HNSW vector store: shared collection='{shared_collection_name}', config_id='{config_id}', index='hnsw_index'")
         
-        # --- Survey-Specific Retriever ---
+        # --- Survey-Specific Retriever (Shared Collection) ---
         def filtered_retriever(query):
             """Perform HNSW vector search with config-based filtering for survey content."""
             try:
@@ -226,7 +224,9 @@ def survey_chat(config_id, chat_id):
                 # Create MongoDB connection and get collection
                 mongo_client = pymongo.MongoClient(current_app.config["MONGO_URI"], serverSelectionTimeoutMS=5000)
                 db = mongo_client[current_app.config["MONGO_DB_NAME"]]
-                collection = db[collection_name]
+                # Use shared collection for all configs
+                shared_collection_name = "documents"
+                collection = db[shared_collection_name]
                 embeddings = current_app.config['EMBEDDINGS']
 
                 vector_store = MongoDBAtlasVectorSearch(
@@ -237,7 +237,7 @@ def survey_chat(config_id, chat_id):
                 
                 # Define the filter for the vector search
                 search_filter = {"config_id": config_id}
-                logger.info(f"🔍 Performing HNSW search in collection '{collection_name}' with filter: {search_filter}")
+                logger.info(f"🔍 Performing HNSW search in shared collection '{shared_collection_name}' with filter: {search_filter}")
 
                 # First, count ALL documents for this config to determine k dynamically
                 total_docs = collection.count_documents({"config_id": config_id})

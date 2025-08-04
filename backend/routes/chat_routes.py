@@ -189,13 +189,11 @@ def chat(config_id, chat_id):
                 return jsonify(message="Authorization error: " + str(e)), 401
         
         db = current_app.config['MONGO_DB']
-        collection_name = config_document.get("collection_name")
-        if not collection_name:
-            logger.error(f"❌ Configuration {config_id} is missing the 'collection_name' field.")
-            return jsonify({"message": "Configuration is missing collection name."}), 400
-
+        # Use single shared collection for all configs (cost-effective for MongoDB Atlas)
+        shared_collection_name = "documents"
+        
         vector_store = MongoDBAtlasVectorSearch(
-            collection=db[collection_name],
+            collection=db[shared_collection_name],
             embedding=current_app.config['EMBEDDINGS'],
             index_name="hnsw_index",
             text_key="text",
@@ -203,11 +201,11 @@ def chat(config_id, chat_id):
         )
         
         # Log vector store initialization
-        logger.info(f"📊 Initialized HNSW vector store: collection='{collection_name}', index='hnsw_index'")
+        logger.info(f"📊 Initialized HNSW vector store: shared collection='{shared_collection_name}', config_id='{config_id}', index='hnsw_index'")
         
         # Create optimized retriever with clean logging
         def filtered_retriever(query):
-            """Perform HNSW vector search with config-based filtering."""
+            """Perform HNSW vector search with config-based filtering on shared collection."""
             import time
             start_time = time.time()
             

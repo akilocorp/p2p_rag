@@ -115,18 +115,18 @@ def delete_config(config_id):
         try:
             db = current_app.config['MONGO_DB']
             
-            # 1. Delete the entire dedicated vector collection for this assistant
+            # 1. Delete documents from shared collection by config_id
+            shared_collection_name = "documents"
             vectors_deleted_count = 0
-            if collection_name:
-                if collection_name in db.list_collection_names():
-                    # To count the documents before dropping, we can do a quick count
-                    vectors_deleted_count = db[collection_name].count_documents({})
-                    db.drop_collection(collection_name)
-                    current_app.logger.info(f"🗑️ Dropped entire collection '{collection_name}' (containing {vectors_deleted_count} vectors) for config_id: {config_id}")
-                else:
-                    current_app.logger.warning(f"⚠️ Collection '{collection_name}' not found for config_id: {config_id}, skipping drop.")
+            
+            if shared_collection_name in db.list_collection_names():
+                # Count documents before deletion
+                vectors_deleted_count = db[shared_collection_name].count_documents({"config_id": str(config_id)})
+                # Delete documents for this specific config_id
+                delete_result = db[shared_collection_name].delete_many({"config_id": str(config_id)})
+                current_app.logger.info(f"🗑️ Deleted {delete_result.deleted_count} documents from shared collection '{shared_collection_name}' for config_id: {config_id}")
             else:
-                current_app.logger.warning(f"⚠️ No collection_name found in config for config_id: {config_id}, cannot delete vector collection.")
+                current_app.logger.warning(f"⚠️ Shared collection '{shared_collection_name}' not found, no vector documents to delete for config_id: {config_id}")
 
             # 2. Find all chat sessions associated with this config_id
             metadata_collection = db['chat_session_metadata']
@@ -137,18 +137,18 @@ def delete_config(config_id):
             chat_sessions_deleted = 0
 
             if session_ids_to_delete:
-                current_app.logger.info(f"💬 Found {len(session_ids_to_delete)} chat sessions to delete for config_id: {config_id}")
+                current_app.logger.info(f"Found {len(session_ids_to_delete)} chat sessions to delete for config_id: {config_id}")
                 
                 # 3. Delete all messages for those sessions from message_store
                 message_collection = db['message_store']
                 message_result = message_collection.delete_many({"SessionId": {"$in": session_ids_to_delete}})
                 chat_messages_deleted = message_result.deleted_count
-                current_app.logger.info(f"🗑️ Deleted {chat_messages_deleted} chat messages for config_id: {config_id}")
+                current_app.logger.info(f"Deleted {vectors_deleted_count} HNSW vector chunks from shared collection for config {config_id}")
 
                 # 4. Delete the chat session metadata itself
                 metadata_result = metadata_collection.delete_many({"config_id": config_id})
                 chat_sessions_deleted = metadata_result.deleted_count
-                current_app.logger.info(f"🗑️ Deleted {chat_sessions_deleted} chat session metadata entries for config_id: {config_id}")
+                current_app.logger.info(f"Deleted {chat_sessions_deleted} chat session metadata entries for config_id: {config_id}")
             
             # 5. Log cleanup summary
             total_deleted = vectors_deleted_count + chat_messages_deleted + chat_sessions_deleted

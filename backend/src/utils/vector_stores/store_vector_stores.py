@@ -114,16 +114,17 @@ def create_hnsw_index_if_not_exists(db, collection_name, index_name, dimensions)
 
 def process_files_and_create_vector_store(temp_file_paths, user_id, collection_name, config_id):
     """
-    Processes multiple uploaded documents, combines their content, creates a single 
-    Chroma vector store, uploads it to S3, and cleans up local files.
+    Processes multiple uploaded documents and stores them in a single shared MongoDB collection.
+    This version uses a single collection for all configs to reduce MongoDB Atlas costs.
 
     Args:
         temp_file_paths (list): A list of paths to the temporary uploaded files.
         user_id (str): The ID of the user.
-        collection_name (str): The name for the ChromaDB collection.
+        collection_name (str): IGNORED - uses fixed 'documents' collection for all configs.
+        config_id (str): The config ID used to filter documents in the shared collection.
 
     Returns:
-        str: The S3 path to the created vector store, or None if an error occurs.
+        MongoDBAtlasVectorSearch: The vector store instance, or None if an error occurs.
     """
     
     
@@ -131,6 +132,10 @@ def process_files_and_create_vector_store(temp_file_paths, user_id, collection_n
 
     try:
         db = current_app.config['MONGO_DB']
+        
+        # Use single shared collection for all configs (cost-effective for MongoDB Atlas)
+        shared_collection_name = "documents"
+        logger.info(f"📦 Using shared collection '{shared_collection_name}' for config_id: {config_id}")
 
         # --- 1. Document Processing Phase ---
         logger.info(f"🚀 Starting document processing for {len(temp_file_paths)} files")
@@ -170,7 +175,7 @@ def process_files_and_create_vector_store(temp_file_paths, user_id, collection_n
                     split.metadata.update({
                         'user_id': user_id,
                         'config_id': str(config_id),
-                        'collection_name': collection_name,
+                        'collection_name': shared_collection_name,  # Use shared collection
                         'original_file': filename,
                         'chunk_index': chunk_index,
                         'total_chunks': len(splits),
@@ -228,10 +233,10 @@ def process_files_and_create_vector_store(temp_file_paths, user_id, collection_n
             
             logger.info(f"📏 Detected embedding dimensions: {dimensions} (took {dimension_time:.2f}s)")
             
-            # Create or verify HNSW index
+            # Create or verify HNSW index on shared collection
             index_name = "hnsw_index"
-            logger.info(f"🏗️ Creating HNSW index '{index_name}' with {dimensions} dimensions...")
-            create_hnsw_index_if_not_exists(db, collection_name, index_name, dimensions)
+            logger.info(f"🏗️ Creating HNSW index '{index_name}' with {dimensions} dimensions on shared collection '{shared_collection_name}'...")
+            create_hnsw_index_if_not_exists(db, shared_collection_name, index_name, dimensions)
             
             # Final metadata enrichment
             logger.info("📝 Enriching document metadata...")
@@ -240,14 +245,14 @@ def process_files_and_create_vector_store(temp_file_paths, user_id, collection_n
                 doc.metadata["embedding_dimensions"] = dimensions
                 doc.metadata["index_name"] = index_name
             
-            # Insert documents into vector store
-            logger.info(f"⬆️ Inserting {len(all_splits)} documents into MongoDB Atlas collection '{collection_name}'...")
+            # Insert documents into shared vector store
+            logger.info(f"⬆️ Inserting {len(all_splits)} documents into shared MongoDB Atlas collection '{shared_collection_name}' for config_id: {config_id}...")
             insert_start = time.time()
             
             vector_store = MongoDBAtlasVectorSearch.from_documents(
                 documents=all_splits,
                 embedding=embeddings,
-                collection=db[collection_name],
+                collection=db[shared_collection_name],
                 index_name=index_name
             )
             
