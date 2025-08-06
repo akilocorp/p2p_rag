@@ -672,7 +672,7 @@ def get_survey_chat_list(config_id):
                 "timestamp": session["timestamp"]
             })
 
-        logger.info(f"ðŸ“‹ Retrieved {len(sessions_list)} survey chat sessions for config {config_id}")
+        logger.info(f"Retrieved {len(sessions_list)} survey chat sessions for config {config_id}")
         return jsonify({"sessions": sessions_list}), 200
 
     except Exception as e:
