@@ -141,18 +141,18 @@ const SurveyChatPage = () => {
           setMessages(formattedMessages);
         } else if (!currentChatId) { // Initialize new survey chat
           const response = await apiClient.post(`/survey-chat/${config_id}/init`, {}, { headers });
-          console.log('🔍 Init response:', response.data);
+          console.log('?? Init response:', response.data);
 
           const initialMessage = response.data.response;
           const newChatId = response.data.chat_id;
-          console.log('🔍 Parsed data:', { initialMessage, newChatId });
+          console.log('?? Parsed data:', { initialMessage, newChatId });
 
           if (initialMessage && newChatId) {
             const newMessage = { text: initialMessage, sender: 'ai' };
-            console.log('🔍 Setting message:', newMessage);
+            console.log('?? Setting message:', newMessage);
             setMessages([newMessage]);
             setCurrentChatId(newChatId);
-            console.log('🔍 State updated, navigating...');
+            console.log('?? State updated, navigating...');
             // Update URL without reloading the page
             navigate(`/survey-chat/${config_id}/${newChatId}`, { replace: true });
           } else {
@@ -319,23 +319,47 @@ const SurveyChatPage = () => {
 
   return (
     <div className="flex h-screen bg-gray-900 text-white font-sans">
-      {/* Only show sidebar for authenticated users */}
-      {isAuthenticated && (
-        <ChatSidebar
-          config={config}
-          configId={config_id}
-          sessions={sessions}
-          userInfo={userInfo}
-          userInfoLoaded={userInfoLoaded}
-          isAuthenticated={isAuthenticated}
-          currentChatId={currentChatId}
-          onNewChat={() => navigate(`/survey-chat/${config_id}`)}
-          isCollapsed={isSidebarCollapsed}
-          onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          onClose={() => setShowSidebar(false)}
-          sessionsLoading={sessionsLoading}
-          chatType="survey"
-        />
+      {/* Desktop Sidebar */}
+      <div className="hidden md:block">
+        {isAuthenticated && (
+          <ChatSidebar
+            config={config}
+            configId={config_id}
+            sessions={sessions}
+            userInfo={userInfo}
+            userInfoLoaded={userInfoLoaded}
+            isAuthenticated={isAuthenticated}
+            currentChatId={currentChatId}
+            onNewChat={() => navigate(`/survey-chat/${config_id}`)}
+            isCollapsed={isSidebarCollapsed}
+            onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            onClose={() => setShowSidebar(false)}
+            sessionsLoading={sessionsLoading}
+            chatType="survey"
+          />
+        )}
+      </div>
+
+      {/* Mobile Sidebar Overlay */}
+      {showSidebar && isAuthenticated && (
+        <div className="fixed inset-0 z-40 bg-black/40 md:hidden">
+          <div className="absolute left-0 top-0 h-full">
+            <ChatSidebar
+              config={config}
+              configId={config_id}
+              sessions={sessions}
+              userInfo={userInfo}
+              userInfoLoaded={userInfoLoaded}
+              isAuthenticated={isAuthenticated}
+              currentChatId={currentChatId}
+              onNewChat={() => navigate(`/survey-chat/${config_id}`)}
+              isCollapsed={false}
+              onClose={() => setShowSidebar(false)}
+              sessionsLoading={sessionsLoading}
+              chatType="survey"
+            />
+          </div>
+        </div>
       )}
       <div className={`relative flex-1 flex flex-col transition-all duration-300 ${
         isAuthenticated && !isSidebarCollapsed ? 'md:ml-72' : 'md:ml-0'

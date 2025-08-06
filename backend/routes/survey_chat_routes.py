@@ -39,14 +39,20 @@ def init_survey_chat(config_id):
         if config_document.get('config_type') != 'survey':
             return jsonify({"error": "This endpoint is only for survey chats"}), 400
 
+        # For public surveys, check if user is authenticated but still allow access
         user_id = "public_user"
-        if not config_document.get("is_public", False):
-            try:
-                verify_jwt_in_request()
-                user_id = get_jwt_identity()
-                if config_document.get("user_id") != user_id:
-                    return jsonify({"error": "Access denied"}), 403
-            except Exception:
+        try:
+            verify_jwt_in_request(optional=True)  # Make JWT verification optional
+            current_user = get_jwt_identity()
+            if current_user:
+                user_id = current_user  # Use authenticated user's ID if available
+                
+            # Check if this is a private survey and user is not the owner
+            if not config_document.get("is_public", False) and config_document.get("user_id") != user_id:
+                return jsonify({"error": "Access denied"}), 403
+        except Exception as e:
+            # If JWT is invalid but survey is public, continue with public_user
+            if not config_document.get("is_public", False):
                 return jsonify({"error": "Authentication required"}), 401
 
         bot_name = config_document.get('bot_name', 'your assistant')
@@ -91,20 +97,26 @@ def survey_chat(config_id, chat_id):
         if config_document.get('config_type') != 'survey':
             return jsonify({"error": "This endpoint is only for survey chats"}), 400
 
+        # For public surveys, check if user is authenticated but still allow access
         user_id = "public_user"
         user_id_for_history = "public_user"
-        if not config_document.get("is_public", False):
-            try:
-                verify_jwt_in_request()
-                user_id = get_jwt_identity()
-                user_id_for_history = user_id
-                if config_document.get("user_id") != user_id:
-                    return jsonify({"error": "Access denied"}), 403
-            except Exception:
+        try:
+            verify_jwt_in_request(optional=True)  # Make JWT verification optional
+            current_user = get_jwt_identity()
+            if current_user:
+                user_id = current_user  # Use authenticated user's ID if available
+                user_id_for_history = current_user
+                
+            # Check if this is a private survey and user is not the owner
+            if not config_document.get("is_public", False) and config_document.get("user_id") != user_id:
+                return jsonify({"error": "Access denied"}), 403
+        except Exception as e:
+            # If JWT is invalid but survey is public, continue with public_user
+            if not config_document.get("is_public", False):
                 return jsonify({"error": "Authentication required"}), 401
 
         # --- LLM Configuration ---
-        logger.info(f"🤖 Initializing LLM for survey chat...")
+        logger.info(f"ðŸ¤– Initializing LLM for survey chat...")
         llm_provider = config_document.get('llm_provider', 'openai')
         llm_type = config_document.get('model_name', 'gpt-3.5-turbo')
         temperature = config_document.get('temperature', 0.7)
@@ -199,7 +211,7 @@ def survey_chat(config_id, chat_id):
             return jsonify({"error": "Survey configuration must include either instructions or use advanced template"}), 400
 
         # --- Vector Store Setup ---
-        logger.info(f"🔍 Setting up vector store for survey...")
+        logger.info(f"ðŸ” Setting up vector store for survey...")
         
         db = current_app.config['MONGO_DB']
         # Use single shared collection for all configs (cost-effective for MongoDB Atlas)
@@ -213,7 +225,7 @@ def survey_chat(config_id, chat_id):
             embedding_key="embedding"
         )
         
-        logger.info(f"📊 Initialized HNSW vector store: shared collection='{shared_collection_name}', config_id='{config_id}', index='hnsw_index'")
+        logger.info(f"ðŸ“Š Initialized HNSW vector store: shared collection='{shared_collection_name}', config_id='{config_id}', index='hnsw_index'")
         
         # --- Survey-Specific Retriever (Shared Collection) ---
         def filtered_retriever(query):
@@ -237,16 +249,16 @@ def survey_chat(config_id, chat_id):
                 
                 # Define the filter for the vector search
                 search_filter = {"config_id": config_id}
-                logger.info(f"🔍 Performing HNSW search in shared collection '{shared_collection_name}' with filter: {search_filter}")
+                logger.info(f"ðŸ” Performing HNSW search in shared collection '{shared_collection_name}' with filter: {search_filter}")
 
                 # First, count ALL documents for this config to determine k dynamically
                 total_docs = collection.count_documents({"config_id": config_id})
-                logger.info(f"📊 Found {total_docs} total documents for config {config_id}")
+                logger.info(f"ðŸ“Š Found {total_docs} total documents for config {config_id}")
                 
                 # Use the total count as k to retrieve ALL documents for this survey
                 # Add buffer of +10 in case of any edge cases
                 k_value = max(total_docs + 10, 20)  # Minimum 20, but scale up as needed
-                logger.info(f"🎯 Setting k={k_value} to retrieve all survey questions")
+                logger.info(f"ðŸŽ¯ Setting k={k_value} to retrieve all survey questions")
 
                 # Perform the search with dynamic k value
                 retriever = vector_store.as_retriever(
@@ -255,24 +267,24 @@ def survey_chat(config_id, chat_id):
                 )
                 
                 docs = retriever.invoke(query)
-                logger.info(f"✅ HNSW search completed. Found {len(docs)} documents.")
+                logger.info(f"âœ… HNSW search completed. Found {len(docs)} documents.")
                 
                 # Log the content of retrieved documents for debugging
                 for i, doc in enumerate(docs):
                     content_preview = doc.page_content[:200].replace('\n', ' ') if doc.page_content else '(empty)'
-                    logger.info(f"📝 Document {i+1}: {content_preview}{'...' if len(doc.page_content) > 200 else ''}")
+                    logger.info(f"ðŸ“ Document {i+1}: {content_preview}{'...' if len(doc.page_content) > 200 else ''}")
                 
                 return docs
 
             except Exception as e:
-                logger.error(f"❌ HNSW search failed: {str(e)}", exc_info=True)
-                logger.info(f"🔄 Survey will continue without vector context for collection '{collection_name}'")
+                logger.error(f"âŒ HNSW search failed: {str(e)}", exc_info=True)
+                logger.info(f"ðŸ”„ Survey will continue without vector context for collection '{collection_name}'")
                 return []
 
         def format_docs(docs):
             """Format retrieved documents into context for the survey LLM with better structure."""
             if not docs:
-                logger.warning("⚠️ No documents to format - empty context will be sent to LLM")
+                logger.warning("âš ï¸ No documents to format - empty context will be sent to LLM")
                 return ""
             
             # Format with clear numbering and separators to help AI track progress
@@ -284,11 +296,11 @@ def survey_chat(config_id, chat_id):
             context = "\n\n".join(formatted_chunks)
             context = f"TOTAL DOCUMENT CHUNKS: {len(docs)}\n\n{context}\n\nREMINDER: You must work through ALL {len(docs)} chunks systematically to ensure no questions are missed."
             
-            logger.info(f"📝 Formatted survey context: {len(docs)} docs, {len(context):,} chars")
+            logger.info(f"ðŸ“ Formatted survey context: {len(docs)} docs, {len(context):,} chars")
             
             # Log context preview for debugging
             preview = context[:300].replace('\n', ' ') if context else "(empty)"
-            logger.info(f"🔍 Survey context preview: {preview}...")
+            logger.info(f"ðŸ” Survey context preview: {preview}...")
             
             return context
 
@@ -314,14 +326,14 @@ def survey_chat(config_id, chat_id):
         )
 
         # --- Generate Survey Response ---
-        logger.info(f"💬 Processing survey interaction: '{user_input[:50]}{'...' if len(user_input) > 50 else ''}'")
+        logger.info(f"ðŸ’¬ Processing survey interaction: '{user_input[:50]}{'...' if len(user_input) > 50 else ''}'")
         
         # Get relevant survey documents
         docs = filtered_retriever(user_input)
         context = format_docs(docs)
         
         # Generate LLM response for survey
-        logger.info(f"🤖 Generating survey response with {len(context):,} chars of context...")
+        logger.info(f"ðŸ¤– Generating survey response with {len(context):,} chars of context...")
         llm_start = time.time()
         
         try:
@@ -331,11 +343,11 @@ def survey_chat(config_id, chat_id):
             )
             
             llm_time = time.time() - llm_start
-            logger.info(f"✅ Survey response generated in {llm_time:.2f}s ({len(response_content)} chars)")
+            logger.info(f"âœ… Survey response generated in {llm_time:.2f}s ({len(response_content)} chars)")
 
             # --- Universal Interactive Response Converter ---
             # Convert ANY survey question to interactive JSON format, regardless of template
-            logger.info(f"🔍 Raw AI response: {response_content[:300]}{'...' if len(response_content) > 300 else ''}")
+            logger.info(f"ðŸ” Raw AI response: {response_content[:300]}{'...' if len(response_content) > 300 else ''}")
             
             def convert_to_interactive_json(text):
                 """Convert survey questions to interactive JSON format automatically."""
@@ -494,10 +506,10 @@ def survey_chat(config_id, chat_id):
             # Convert to interactive format if it's a survey question
             interactive_response = convert_to_interactive_json(response_content)
             if interactive_response != response_content:
-                logger.info("✅ Converted survey question to interactive JSON format")
+                logger.info("âœ… Converted survey question to interactive JSON format")
                 response_content = interactive_response
             else:
-                logger.info("ℹ️ Response kept as original text (not a detectable question format)")
+                logger.info("â„¹ï¸ Response kept as original text (not a detectable question format)")
             
             # --- Robust JSON Extraction (fallback) ---
             def extract_json_from_response(text):
@@ -520,18 +532,18 @@ def survey_chat(config_id, chat_id):
                 return None
             
             extracted_json = extract_json_from_response(response_content)
-            logger.info(f"🔍 Extracted JSON: {extracted_json[:200] if extracted_json else 'None'}{'...' if extracted_json and len(extracted_json) > 200 else ''}")
+            logger.info(f"ðŸ” Extracted JSON: {extracted_json[:200] if extracted_json else 'None'}{'...' if extracted_json and len(extracted_json) > 200 else ''}")
             
             if extracted_json:
                 try:
                     # Validate the extracted string is valid JSON
                     json.loads(extracted_json)
                     response_content = extracted_json  # Replace response with clean JSON
-                    logger.info("✅ Extracted and validated JSON from LLM response.")
+                    logger.info("âœ… Extracted and validated JSON from LLM response.")
                 except json.JSONDecodeError:
-                    logger.warning("⚠️ Found a JSON-like object, but it was invalid. Using original response.")
+                    logger.warning("âš ï¸ Found a JSON-like object, but it was invalid. Using original response.")
             else:
-                logger.info("ℹ️ No JSON object found in response, keeping original text.")
+                logger.info("â„¹ï¸ No JSON object found in response, keeping original text.")
             
             # Prepare source information for survey
             sources = []
@@ -543,9 +555,9 @@ def survey_chat(config_id, chat_id):
                 }
                 sources.append(source_info)
             
-            logger.info(f"📊 Survey interaction completed: {len(docs)} sources, response length: {len(response_content)}")
-            logger.info(f"🔍 Final response content: {response_content[:200]}{'...' if len(response_content) > 200 else ''}")
-            logger.info(f"🔍 JSON extracted flag: {extracted_json is not None}")
+            logger.info(f"ðŸ“Š Survey interaction completed: {len(docs)} sources, response length: {len(response_content)}")
+            logger.info(f"ðŸ” Final response content: {response_content[:200]}{'...' if len(response_content) > 200 else ''}")
+            logger.info(f"ðŸ” JSON extracted flag: {extracted_json is not None}")
             
             return jsonify({
                 "response": response_content,
@@ -561,14 +573,14 @@ def survey_chat(config_id, chat_id):
             
         except Exception as llm_error:
             llm_time = time.time() - llm_start
-            logger.error(f"❌ Survey LLM generation failed after {llm_time:.2f}s: {str(llm_error)}")
+            logger.error(f"âŒ Survey LLM generation failed after {llm_time:.2f}s: {str(llm_error)}")
             return jsonify({
                 "error": "Failed to generate survey response",
                 "message": "An error occurred while processing your survey response."
             }), 500
 
     except Exception as e:
-        logger.error(f"❌ Unexpected error in survey chat endpoint: {str(e)}", exc_info=True)
+        logger.error(f"âŒ Unexpected error in survey chat endpoint: {str(e)}", exc_info=True)
         return jsonify({
             "error": "Internal server error",
             "message": "An unexpected error occurred while processing your survey request."
@@ -586,11 +598,13 @@ def get_survey_chat_list(config_id):
         metadata_collection = db["chat_session_metadata"]
 
         # Pipeline to get survey chat sessions - looks for AI messages first
+        # Get both the user's chats and public user chats for this config
         pipeline = [
             {
                 '$match': {
                     '$or': [
                         {'user_id': user_id},
+                        {'user_id': "public_user"},  # Include public_user chats
                         {'user_id': "anonymous"}
                     ],
                     'config_id': config_id
@@ -627,13 +641,14 @@ def get_survey_chat_list(config_id):
         sessions_list = []
         for session in sessions_from_db:
             
-            # Claim anonymous chats for current user
-            if session.get('user_id') == 'anonymous':
+            # Claim anonymous or public_user chats for current user
+            if session.get('user_id') in ['anonymous', 'public_user']:
                 metadata_collection.update_one(
                     {"_id": session["_id"]},
                     {"$set": {"user_id": user_id}}
                 )
-                logger.info(f"✅ Claimed anonymous survey chat {session['session_id']} for user {user_id}")
+                logger.info(f"âœ… Claimed {session.get('user_id')} survey chat {session['session_id']} for user {user_id}")
+                session['user_id'] = user_id  # Update the session in memory for title processing
 
             # Create title from first AI message (survey question)
             title = "Survey Chat"
@@ -657,9 +672,9 @@ def get_survey_chat_list(config_id):
                 "timestamp": session["timestamp"]
             })
 
-        logger.info(f"📋 Retrieved {len(sessions_list)} survey chat sessions for config {config_id}")
+        logger.info(f"ðŸ“‹ Retrieved {len(sessions_list)} survey chat sessions for config {config_id}")
         return jsonify({"sessions": sessions_list}), 200
 
     except Exception as e:
-        logger.error(f"❌ Error fetching survey chat sessions: {str(e)}", exc_info=True)
+        logger.error(f"âŒ Error fetching survey chat sessions: {str(e)}", exc_info=True)
         return jsonify({"message": "Failed to fetch survey chat sessions"}), 500

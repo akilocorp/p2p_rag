@@ -98,15 +98,16 @@ const ChatPage = () => {
           try {
             response = await apiClient.get(`/config/${configId}`);
           } catch (authError) {
-            // If authenticated request fails, try without auth (might be a public chat)
+            // If authenticated request fails, it might be a public chat, so try without auth
             if (authError.response?.status === 401 || authError.response?.status === 403) {
               response = await axios.get(`/api/config/${configId}`);
             } else {
+              // For other errors, we should not retry and instead show the error
               throw authError;
             }
           }
         } else {
-          // If user is not authenticated, use direct axios call
+          // If user is not authenticated, use a direct axios call for public configs
           response = await axios.get(`/api/config/${configId}`);
         }
         

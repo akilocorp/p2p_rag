@@ -16,8 +16,13 @@ const PublicChatRoute = ({ children }) => {
         return;
       }
       try {
-        // Make a direct axios request without authentication headers
-        const response = await axios.get(`/api/config/${configId}`);
+        let response;
+        if (isAuthenticated) {
+          const apiClient = (await import('../api/apiClient')).default;
+          response = await apiClient.get(`/config/${configId}`);
+        } else {
+          response = await axios.get(`/api/config/${configId}`);
+        }
         setIsPublic(response.data.config.is_public);
       } catch (error) {
         console.error('Failed to fetch config:', error);

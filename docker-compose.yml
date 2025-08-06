@@ -1,24 +1,18 @@
-# This version of the docker-compose.yml file is for LOCAL DEVELOPMENT.
-# It uses the 'build' directive to create new images from your local Dockerfiles.
-# Use this on your local machine to build and push images to ECR.
-
 
 services:
   backend:
     build: ./backend
-    image: 235639741719.dkr.ecr.us-east-2.amazonaws.com/my-chat-app/backend:latest
-    container_name: rag_platform_backend_dev
-    env_file:
-      - ./backend/.env
+    container_name: rag_platform_backend
     ports:
       - "5000:5000"
+    env_file:
+      - ./backend/.env
     networks:
       - rag_network
 
   frontend:
     build: ./frontend
-    image: 235639741719.dkr.ecr.us-east-2.amazonaws.com/my-chat-app/frontend:latest
-    container_name: rag_platform_frontend_dev
+    container_name: rag_platform_frontend
     ports:
       - "5173:5173"
     networks:
@@ -29,4 +23,3 @@ services:
 networks:
   rag_network:
     driver: bridge
-    name: rag_network

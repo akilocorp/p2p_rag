@@ -16,8 +16,13 @@ const PublicSurveyChatRoute = ({ children }) => {
         return;
       }
       try {
-        // Make a direct axios request without authentication headers for survey config
-        const response = await axios.get(`/api/survey_config/${config_id}`);
+        let response;
+        if (isAuthenticated) {
+          const apiClient = (await import('../api/apiClient')).default;
+          response = await apiClient.get(`/survey_config/${config_id}`);
+        } else {
+          response = await axios.get(`/api/survey_config/${config_id}`);
+        }
         setIsPublic(response.data.config.is_public);
       } catch (error) {
         console.error('Failed to fetch survey config:', error);

@@ -50,9 +50,8 @@ apiClient.interceptors.response.use(
             return Promise.reject(error);
         }
 
-        // Make a request to your /refresh endpoint
-
-        const response = await axios.post('http://localhost:5000/api/auth/refresh', {}, {
+        // Make a request to the refresh endpoint using relative URL
+        const response = await axios.post('/api/auth/refresh', {}, {
           headers: { 'Authorization': `Bearer ${refreshToken}` }
         });
 
