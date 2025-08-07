@@ -61,8 +61,12 @@ def init_survey_chat(config_id):
         # Create smart hardcoded greeting that works for both template types
         chat_id = str(ObjectId())
         
-        # Generate simple hardcoded greeting for both template types
-        welcome_message = f"Hello! I'm {bot_name}. I'm here to conduct a survey with you. Would you like to begin?"
+        # Get survey purpose from config or show placeholder
+        survey_purpose = config_document.get('survey_purpose')
+        purpose_text = f"about {survey_purpose} " if survey_purpose else "(survey purpose) "
+        
+        # Generate welcome message with survey purpose
+        welcome_message = f"Hello! I'm {bot_name}. I'm here to conduct a survey {purpose_text}Your input will help us improve our services. Would you like to begin?"
         
         # Save the greeting to chat history
         history = get_session_history(chat_id, user_id, config_id)
