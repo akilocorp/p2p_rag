@@ -95,7 +95,7 @@ def configure_survey_model():
         # New survey parameters for advanced template
         survey_purpose = config_data.get('survey_purpose', 'gathering feedback')
         target_audience = config_data.get('target_audience', 'general users')
-        creativity_rate = config_data.get('creativity_rate', 3)
+        creativity_rate = int(config_data.get('creativity_rate', 3))  # Convert to int
         
         # Calculate temperature from creativity rate (1-5 scale to 0.1-0.9 temperature)
         temperature = 0.1 + (creativity_rate - 1) * 0.2  # 1->0.1, 2->0.3, 3->0.5, 4->0.7, 5->0.9

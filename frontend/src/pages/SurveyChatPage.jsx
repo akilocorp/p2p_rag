@@ -47,8 +47,18 @@ const ChatMessage = ({ message, onInteractiveSubmit }) => {
             </div>
           ) : (
             <div
-              className="prose prose-invert max-w-none text-gray-100"
-              dangerouslySetInnerHTML={createMarkup(text)}
+              className="max-w-none text-gray-100"
+              dangerouslySetInnerHTML={{
+                __html: marked.parse(text, {
+                  mangle: false,
+                  headerIds: false,
+                  gfm: true,
+                  breaks: true,
+                  smartLists: true,
+                  smartypants: true,
+                  xhtml: true
+                })
+              }}
             />
           )}
         </div>
@@ -428,6 +438,11 @@ const SurveyChatPage = () => {
                 {isLoading ? <FiLoader className="animate-spin" /> : <FiSend />}
               </button>
             </div>
+            {isAuthenticated && (
+              <p className="text-xs text-gray-500 mt-2 text-center">
+                {config?.is_public ? 'Public survey' : 'Private survey'} • Powered by {config?.model_name || 'AI'}
+              </p>
+            )}
           </div>
         </footer>
       </div>

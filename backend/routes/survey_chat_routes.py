@@ -66,7 +66,7 @@ def init_survey_chat(config_id):
         purpose_text = f"about {survey_purpose} " if survey_purpose else "(survey purpose) "
         
         # Generate welcome message with survey purpose
-        welcome_message = f"Hello! I'm {bot_name}. I'm here to conduct a survey {purpose_text}Your input will help us improve our services. Would you like to begin?"
+        welcome_message = f"Hello 👋 I'm {bot_name}. I'm here to conduct a survey {purpose_text}, Your input will help us improve our services. Would you like to begin?"
         
         # Save the greeting to chat history
         history = get_session_history(chat_id, user_id, config_id)
@@ -122,16 +122,20 @@ def survey_chat(config_id, chat_id):
         # --- LLM Configuration ---
         logger.info(f"ðŸ¤– Initializing LLM for survey chat...")
         llm_provider = config_document.get('llm_provider', 'openai')
-        llm_type = config_document.get('model_name', 'gpt-3.5-turbo')
+        model_name = config_document.get('model_name', 'gpt-3.5-turbo')
         temperature = config_document.get('temperature', 0.7)
-        logger.info(f"Initializing LLM: {llm_type} with temperature: {temperature}")
-
-        if llm_type == 'qwen-turbo':
-            llm = ChatTongyi(model_name=llm_type, temperature=temperature)
-        elif llm_type == 'deepseek-chat':
-            llm = ChatDeepSeek(model_name=llm_type, temperature=temperature)
-        else: # Default to OpenAI
-            llm = ChatOpenAI(model_name=llm_type, temperature=temperature)
+        logger.info(f"Initializing LLM: {model_name} with temperature: {temperature}")
+        llm = None
+        
+        if model_name.startswith('gpt'):
+            llm = ChatOpenAI(model=model_name, temperature=temperature, api_key=current_app.config.get("OPENAI_API_KEY"))
+        elif model_name.startswith('qwen'):
+            llm = ChatTongyi(model=model_name, api_key=current_app.config.get("QWEN_API_KEY"))
+        elif model_name.startswith('deepseek'):
+            llm = ChatDeepSeek(model=model_name, temperature=temperature, api_key=current_app.config.get("DEEPSEEK_API_KEY"))
+        
+        if not llm:
+            return jsonify({"message": f"Unsupported model: {model_name}"}), 400
 
         # --- Dynamic Prompt Creation ---
         instructions = config_document.get('instructions')
@@ -147,30 +151,46 @@ def survey_chat(config_id, chat_id):
             # Survey questions come from uploaded documents
             survey_questions = 'questions from uploaded documents'
             
-            # Comprehensive survey AI bot template
+            # Ultra-conversational survey template
+            tone_style = [
+                'friendly and professional',  # Level 1-2
+                'warm and engaging',  # Level 3-4
+                'exceptionally warm, personal, and conversational'  # Level 5
+            ][min(2, (creativity_rate - 1) // 2)]
+            
+            # Natural conversation-based survey template
             advanced_template = (
-                f"You are {bot_name}, a professional survey conductor. Your role is to conduct a comprehensive survey based on the questions provided in the context.\n\n"
+                f"You are {bot_name}, conducting a friendly, natural conversation to learn about {survey_purpose}. "
+                f"Your role is to have a flowing dialogue that feels like a comfortable chat with a friend.\n\n"
+                f"**CONVERSATION STYLE:**\n"
+                f"1. Be warm, curious, and genuinely interested in their responses\n"
+                f"2. Build on their answers to create a natural flow between questions\n"
+                f"3. Acknowledge their responses naturally before moving to the next topic\n"
+                f"4. Use their exact words and details to make the conversation feel personal\n\n"
+                f"**QUESTION HANDLING:**\n"
+                f"1. Be conversational and natural in your approach\n"
+                f"2. When asking questions from the context, include the complete question with all its options\n"
+                f"3. You can add friendly lead-ins, but make sure the full question is presented\n"
+                f"4. Example: 'I'm curious about this - [complete question with all options from context]'\n\n"
                 f"**SURVEY CONTEXT:**\n"
-                f"- Survey Purpose: {survey_purpose}\n"
-                f"- Target Audience: {target_audience}\n"
-                f"- Creativity Level: {creativity_rate}/5 (1=strict, 5=highly creative)\n\n"
-                f"**SURVEY BEHAVIOR INSTRUCTIONS:**\n"
-                f"1. **Question Source**: Use ONLY the questions from the uploaded documents in the context below. Do NOT create your own questions.\n"
-                f"2. **Systematic Coverage**: Ask ALL questions from the context systematically. Keep track of which questions you have asked.\n"
-                f"3. **One Question at a Time**: Present one question at a time and wait for the user's response before proceeding.\n"
-                f"4. **Question Format**: Present questions exactly as they appear in the context, including all answer choices if provided.\n"
-                f"5. **Audience Adaptation**: Adapt your language and tone to suit the {target_audience} audience.\n"
-                f"6. **Creativity Application**: Apply creativity level {creativity_rate}/5 to your question presentation style:\n"
-                f"   - Level 1-2: Direct, formal presentation\n"
-                f"   - Level 3-4: Friendly, conversational approach\n"
-                f"   - Level 5: Engaging, creative question delivery\n"
-                f"7. **Progress Tracking**: Keep mental track of survey progress and inform users of their progress occasionally.\n"
-                f"8. **Final Report**: After all questions are completed, provide a comprehensive summary report listing all questions asked and the user's responses.\n"
-                f"9. **Early Completion**: If the user wants to stop early, provide a partial report of questions asked so far.\n\n"
-                f"**IMPORTANT**: Your responses will be automatically converted to interactive format. Simply present the questions naturally - the system will handle the interactive elements.\n\n"
-                f"**CONTEXT WITH SURVEY QUESTIONS:**\n"
+                f"- Purpose: {survey_purpose}\n"
+                f"- Audience: {target_audience}\n"
+                f"- Style: Natural conversation (creativity: {creativity_rate}/5)\n\n"
+                f"**CONVERSATION FLOW:**\n"
+                f"1. Acknowledge their previous response naturally\n"
+                f"2. Create smooth transitions to the next topic\n"
+                f"3. When presenting questions, include the complete question as written in context\n"
+                f"4. Reference their earlier answers to maintain personal connection\n\n"
+                f"**FINAL SUMMARY:**\n"
+                f"When all topics are covered, provide a natural conclusion that includes:\n"
+                f"1. A genuine thank you for their time\n"
+                f"2. A brief recap of key points they shared\n"
+                f"3. Next steps or how their input will be used\n\n"
+                f"**SURVEY QUESTIONS (USE EXACTLY AS WRITTEN):**\n"
                 f"{{context}}\n\n"
-                f"Present the next appropriate survey question or provide a summary report if the survey is complete. Remember to maintain the appropriate creativity level and audience focus."
+                f"Begin with a warm greeting. Have a natural conversation that flows from topic to topic. "
+                f"When asking questions, make sure to include the complete question with all its options so the system can create the right interactive format. "
+                f"Balance being conversational with being thorough in presenting the questions."
             )
             prompt = ChatPromptTemplate.from_messages([
                 ('system', advanced_template),
@@ -354,7 +374,7 @@ def survey_chat(config_id, chat_id):
             logger.info(f"ðŸ” Raw AI response: {response_content[:300]}{'...' if len(response_content) > 300 else ''}")
             
             def convert_to_interactive_json(text):
-                """Convert survey questions to interactive JSON format automatically."""
+                """Enhanced Universal Interactive Response Converter - detects and converts any question format."""
                 import re
                 
                 # If already JSON, return as-is
@@ -365,81 +385,168 @@ def survey_chat(config_id, chat_id):
                     except:
                         pass
                 
-                # Detect multiple choice questions
-                mc_pattern = r'(.+?)\?[\s\n]*([A-Z]\)\s*.+?)(?:\n[A-Z]\)\s*.+?)*'
-                if re.search(r'[A-Z]\)\s*', text) and '?' in text:
-                    lines = text.split('\n')
-                    question = ''
-                    options = []
-                    
-                    for line in lines:
-                        line = line.strip()
-                        if '?' in line and not line.startswith(('A)', 'B)', 'C)', 'D)', 'E)', 'F)')):
-                            question = line
-                        elif re.match(r'^[A-Z]\)\s*', line):
-                            option = re.sub(r'^[A-Z]\)\s*', '', line)
-                            options.append(option)
-                    
-                    if question and options:
-                        return json.dumps({
-                            "type": "multiple_choice",
-                            "question": question,
-                            "options": options,
-                            "required": True
-                        })
+                # Clean and normalize text
+                text = text.strip()
+                logger.info(f"🔍 Analyzing text for question patterns: {text[:200]}...")
                 
-                # Detect scale questions (1-5 or 1-10)
-                scale_1_5 = re.search(r'scale.*1.*5|1.*5.*scale|rate.*1.*5|1.*5.*rate', text, re.IGNORECASE)
-                scale_1_10 = re.search(r'scale.*1.*10|1.*10.*scale|rate.*1.*10|1.*10.*rate', text, re.IGNORECASE)
+                # Enhanced Multiple Choice Detection
+                # Patterns: A) B) C), (A) (B) (C), 1) 2) 3), a) b) c)
+                mc_patterns = [
+                    r'[A-Z]\)\s*',  # A) B) C)
+                    r'\([A-Z]\)\s*',  # (A) (B) (C)
+                    r'[0-9]\)\s*',  # 1) 2) 3)
+                    r'[a-z]\)\s*',  # a) b) c)
+                ]
                 
-                if scale_1_5 or scale_1_10:
-                    question_match = re.search(r'(.+?)(?:scale|rate)', text, re.IGNORECASE)
-                    if not question_match:
-                        # Try to find question before scale mention
+                for pattern in mc_patterns:
+                    if re.search(pattern, text) and '?' in text:
+                        logger.info(f"✅ Detected multiple choice pattern: {pattern}")
+                        lines = text.split('\n')
+                        question = ''
+                        options = []
+                        
+                        for line in lines:
+                            line = line.strip()
+                            if '?' in line and not re.match(pattern, line):
+                                if not question or len(line) > len(question):
+                                    question = line
+                            elif re.match(pattern, line):
+                                option = re.sub(pattern, '', line).strip()
+                                if option:
+                                    options.append(option)
+                        
+                        if question and len(options) >= 2:
+                            logger.info(f"✅ Multiple choice detected: {len(options)} options")
+                            return json.dumps({
+                                "type": "multiple_choice",
+                                "question": question,
+                                "options": options,
+                                "required": True
+                            })
+                
+                # Enhanced Scale Detection
+                # Patterns: 1-5, 1-10, 1 to 5, scale of 1-5, rate 1-10, etc.
+                scale_patterns = [
+                    (r'scale.*?1.*?5|1.*?5.*?scale|rate.*?1.*?5|1.*?5.*?rate|1\s*-\s*5|1\s*to\s*5', 1, 5),
+                    (r'scale.*?1.*?10|1.*?10.*?scale|rate.*?1.*?10|1.*?10.*?rate|1\s*-\s*10|1\s*to\s*10', 1, 10),
+                    (r'scale.*?1.*?7|1.*?7.*?scale|rate.*?1.*?7|1.*?7.*?rate|1\s*-\s*7|1\s*to\s*7', 1, 7),
+                    (r'scale.*?0.*?10|0.*?10.*?scale|rate.*?0.*?10|0.*?10.*?rate|0\s*-\s*10|0\s*to\s*10', 0, 10),
+                ]
+                
+                for pattern, min_val, max_val in scale_patterns:
+                    if re.search(pattern, text, re.IGNORECASE):
+                        logger.info(f"✅ Detected scale pattern: {min_val}-{max_val}")
+                        
+                        # Extract question
+                        question = ''
                         question_lines = [line.strip() for line in text.split('\n') if '?' in line]
                         if question_lines:
                             question = question_lines[0]
                         else:
-                            question = text.split('\n')[0].strip()
-                    else:
-                        question = question_match.group(1).strip()
-                    
-                    if question:
-                        if scale_1_10:
+                            # Try to extract question before scale mention
+                            question_match = re.search(r'(.+?)(?:scale|rate|1)', text, re.IGNORECASE)
+                            if question_match:
+                                question = question_match.group(1).strip()
+                            else:
+                                question = text.split('\n')[0].strip()
+                        
+                        if question:
+                            labels = [str(i) for i in range(min_val, max_val + 1)]
+                            logger.info(f"✅ Scale question detected: {min_val}-{max_val}")
                             return json.dumps({
                                 "type": "scale",
                                 "question": question,
-                                "scale_min": 1,
-                                "scale_max": 10,
-                                "scale_labels": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
-                                "required": True
-                            })
-                        else:
-                            return json.dumps({
-                                "type": "scale",
-                                "question": question,
-                                "scale_min": 1,
-                                "scale_max": 5,
-                                "scale_labels": ["1", "2", "3", "4", "5"],
+                                "scale_min": min_val,
+                                "scale_max": max_val,
+                                "scale_labels": labels,
                                 "required": True
                             })
                 
-                # Detect dropdown questions (education, selection lists)
-                if re.search(r'(education|degree|select|choose)', text, re.IGNORECASE) and '-' in text:
+                # Enhanced Dropdown Detection
+                # Detects: education, selection lists, "is it", comma-separated, dash-separated, etc.
+                dropdown_keywords = r'(education|degree|select|choose|is it|which|what.*level|what.*type|category|status|prefer)'
+                
+                if re.search(dropdown_keywords, text, re.IGNORECASE) or (',' in text and '?' in text):
+                    logger.info(f"✅ Potential dropdown detected with keywords or comma pattern")
                     lines = text.split('\n')
                     question = ''
                     options = []
                     
-                    for line in lines:
-                        line = line.strip()
-                        if '?' in line and not line.startswith('-'):
-                            question = line
-                        elif line.startswith('-'):
-                            option = line[1:].strip()
-                            if option:
-                                options.append(option)
+                    # Method 1: Dash-separated options (-)
+                    if '-' in text:
+                        logger.info(f"🔍 Trying dash-separated format")
+                        for line in lines:
+                            line = line.strip()
+                            if '?' in line and not line.startswith('-'):
+                                question = line
+                            elif line.startswith('-'):
+                                option = line[1:].strip()
+                                if option:
+                                    options.append(option)
                     
-                    if question and options:
+                    # Method 2: Bullet points (•)
+                    elif '•' in text:
+                        logger.info(f"🔍 Trying bullet point format")
+                        for line in lines:
+                            line = line.strip()
+                            if '?' in line and not line.startswith('•'):
+                                question = line
+                            elif line.startswith('•'):
+                                option = line[1:].strip()
+                                if option:
+                                    options.append(option)
+                    
+                    # Method 3: Comma-separated options ("Is it A, B, C, or D?")
+                    elif ',' in text and '?' in text:
+                        logger.info(f"🔍 Trying comma-separated format")
+                        # Find the question part
+                        question_match = re.search(r'(.+?)\?', text, re.DOTALL)
+                        if question_match:
+                            full_question = question_match.group(0)
+                            question = full_question
+                            
+                            # Multiple extraction patterns
+                            extraction_patterns = [
+                                r'is it (.+?)\?',  # "Is it A, B, C?"
+                                r'(?:choose|select).*?:(.+?)\?',  # "Choose: A, B, C?"
+                                r'(?:level|type|category).*?:(.+?)\?',  # "Level: A, B, C?"
+                                r'completed\?\s*(.+?)\?',  # "completed? A, B, C?"
+                                r'\?\s*(.+?)\?',  # General pattern after ?
+                            ]
+                            
+                            for pattern in extraction_patterns:
+                                options_match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+                                if options_match:
+                                    options_str = options_match.group(1)
+                                    # Split by various delimiters
+                                    raw_options = re.split(r',|\bor\b|;|\band\b', options_str)
+                                    options = [opt.strip() for opt in raw_options if opt.strip() and len(opt.strip()) > 1]
+                                    if len(options) >= 2:
+                                        logger.info(f"✅ Extracted {len(options)} options using pattern: {pattern}")
+                                        break
+                            
+                            # Fallback: extract from the question itself if it contains options
+                            if not options and (',' in full_question or ' or ' in full_question):
+                                # Look for patterns like "A, B, C, or D"
+                                option_pattern = r'([A-Z][^,?]+(?:,\s*[A-Z][^,?]+)*(?:,?\s*or\s*[A-Z][^,?]+)?)'
+                                option_match = re.search(option_pattern, full_question)
+                                if option_match:
+                                    options_str = option_match.group(1)
+                                    raw_options = re.split(r',|\bor\b', options_str)
+                                    options = [opt.strip() for opt in raw_options if opt.strip()]
+                    
+                    # Method 4: Colon-separated format ("Education: A, B, C")
+                    elif ':' in text:
+                        logger.info(f"🔍 Trying colon-separated format")
+                        parts = text.split(':')
+                        if len(parts) >= 2:
+                            question = parts[0].strip() + '?'
+                            options_part = parts[1].strip()
+                            raw_options = re.split(r',|\bor\b|;', options_part)
+                            options = [opt.strip() for opt in raw_options if opt.strip() and len(opt.strip()) > 1]
+                    
+                    if question and options and len(options) >= 2:
+                        logger.info(f"✅ Dropdown detected: '{question}' with {len(options)} options: {options}")
                         return json.dumps({
                             "type": "dropdown",
                             "question": question,
@@ -447,16 +554,59 @@ def survey_chat(config_id, chat_id):
                             "required": True
                         })
                 
-                # Detect yes/no questions
-                if re.search(r'\b(yes|no)\b', text, re.IGNORECASE) and '?' in text:
-                    question_lines = [line.strip() for line in text.split('\n') if '?' in line]
-                    if question_lines:
-                        question = question_lines[0]
-                        return json.dumps({
-                            "type": "yes_no",
-                            "question": question,
-                            "required": True
-                        })
+                # Enhanced Open-Ended Detection (PRIORITY - check first)
+                open_ended_keywords = [
+                    r'explain', r'describe', r'detail', r'motivate', r'change',
+                    r'why', r'how.*think', r'how.*feel', r'how.*should', r'how.*would',
+                    r'what.*think', r'what.*feel', r'what.*opinion', r'what.*should',
+                    r'tell.*about', r'share.*thoughts', r'elaborate', r'comment',
+                    r'feedback', r'suggestions', r'improvements', r'experience',
+                    r'thoughts', r'feelings', r'concerns', r'ideas'
+                ]
+                
+                for keyword in open_ended_keywords:
+                    if re.search(keyword, text, re.IGNORECASE) and '?' in text:
+                        logger.info(f"✅ Open-ended keyword detected: {keyword}")
+                        question_lines = [line.strip() for line in text.split('\n') if '?' in line]
+                        if question_lines:
+                            question = question_lines[0]
+                            logger.info(f"✅ Open-ended question detected")
+                            return json.dumps({
+                                "type": "open_ended",
+                                "question": question,
+                                "placeholder": "Please share your thoughts...",
+                                "required": False
+                            })
+                
+                # Enhanced Yes/No Detection (more specific patterns)
+                # Only match simple yes/no questions, not complex "how do you think" questions
+                yes_no_patterns = [
+                    r'\b(yes|no)\b.*\?',  # Contains yes/no and ends with ?
+                    r'\b(true|false)\b.*\?',  # Contains true/false and ends with ?
+                    r'\b(agree|disagree)\b.*\?',  # Contains agree/disagree and ends with ?
+                    r'^do you (like|want|need|have|own|use)\b',  # Simple "do you like/want/need" questions
+                    r'^have you (ever|been|done|tried|used)\b',  # Simple "have you ever" questions
+                    r'^are you (a|an|currently|planning|interested)\b',  # Simple "are you" questions
+                    r'^will you\b',  # Simple "will you" questions
+                    r'^would you (like|prefer|consider|be)\b',  # Simple "would you" questions
+                    r'^can you\b',  # Simple "can you" questions
+                    r'^did you\b'   # Simple "did you" questions
+                ]
+                
+                for pattern in yes_no_patterns:
+                    if re.search(pattern, text, re.IGNORECASE) and '?' in text:
+                        # Additional check: avoid complex questions with "how", "what", "why"
+                        if not re.search(r'\b(how|what|why|explain|describe)\b', text, re.IGNORECASE):
+                            logger.info(f"✅ Yes/No pattern detected: {pattern}")
+                            question_lines = [line.strip() for line in text.split('\n') if '?' in line]
+                            if question_lines:
+                                question = question_lines[0]
+                                logger.info(f"✅ Yes/No question detected")
+                                return json.dumps({
+                                    "type": "yes_no",
+                                    "question": question,
+                                    "required": True
+                                })
                 
                 # Detect multiple select questions (select all that apply)
                 if re.search(r'select all|all that apply|check all', text, re.IGNORECASE) and re.search(r'[A-Z]\)\s*', text):
@@ -480,16 +630,49 @@ def survey_chat(config_id, chat_id):
                             "required": False
                         })
                 
-                # Detect open-ended questions
-                if '?' in text and ('explain' in text.lower() or 'describe' in text.lower() or 'detail' in text.lower() or 'motivate' in text.lower() or 'change' in text.lower()):
+                # (Open-ended detection moved to priority section above)
+                
+                # Date/Time Questions
+                if re.search(r'\b(date|time|when|birthday|birth|age)\b', text, re.IGNORECASE) and '?' in text:
+                    logger.info(f"✅ Date/time pattern detected")
+                    question_lines = [line.strip() for line in text.split('\n') if '?' in line]
+                    if question_lines:
+                        question = question_lines[0]
+                        if re.search(r'\b(birthday|birth)\b', text, re.IGNORECASE):
+                            return json.dumps({
+                                "type": "date",
+                                "question": question,
+                                "required": True
+                            })
+                        elif re.search(r'\b(time)\b', text, re.IGNORECASE):
+                            return json.dumps({
+                                "type": "time",
+                                "question": question,
+                                "required": True
+                            })
+                
+                # Email Questions
+                if re.search(r'\b(email|e-mail)\b', text, re.IGNORECASE) and '?' in text:
+                    logger.info(f"✅ Email pattern detected")
                     question_lines = [line.strip() for line in text.split('\n') if '?' in line]
                     if question_lines:
                         question = question_lines[0]
                         return json.dumps({
-                            "type": "open_ended",
+                            "type": "email",
                             "question": question,
-                            "placeholder": "Please share your thoughts...",
-                            "required": False
+                            "required": True
+                        })
+                
+                # Phone Number Questions
+                if re.search(r'\b(phone|telephone|mobile|cell)\b', text, re.IGNORECASE) and '?' in text:
+                    logger.info(f"✅ Phone pattern detected")
+                    question_lines = [line.strip() for line in text.split('\n') if '?' in line]
+                    if question_lines:
+                        question = question_lines[0]
+                        return json.dumps({
+                            "type": "phone",
+                            "question": question,
+                            "required": True
                         })
                 
                 # Fallback: if it contains a question mark, make it open-ended
