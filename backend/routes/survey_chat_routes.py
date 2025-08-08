@@ -485,13 +485,13 @@ def survey_chat(config_id, chat_id):
                                     options.append(option)
                     
                     # Method 2: Bullet points (•)
-                    elif '•' in text:
+                    elif '\u2022' in text or '*' in text:
                         logger.info(f"🔍 Trying bullet point format")
                         for line in lines:
                             line = line.strip()
-                            if '?' in line and not line.startswith('•'):
+                            if '?' in line and not (line.startswith('\u2022') or line.startswith('*')):
                                 question = line
-                            elif line.startswith('•'):
+                            elif line.startswith('\u2022') or line.startswith('*'):
                                 option = line[1:].strip()
                                 if option:
                                     options.append(option)
