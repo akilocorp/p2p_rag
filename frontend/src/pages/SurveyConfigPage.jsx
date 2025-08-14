@@ -26,14 +26,36 @@ const FileUpload = ({ onFileChange, initialFiles }) => {
     e.preventDefault();
     setIsDragging(false);
     const newFiles = Array.from(e.dataTransfer.files);
-    const updatedFiles = [...files, ...newFiles];
+    const maxFileSize = 5 * 1024 * 1024 * 1024; // 5GB
+    const validFiles = [];
+    
+    newFiles.forEach(file => {
+      if (file.size > maxFileSize) {
+        alert(`File ${file.name} is too large. Maximum size is 5GB.`);
+      } else {
+        validFiles.push(file);
+      }
+    });
+    
+    const updatedFiles = [...files, ...validFiles];
     setFiles(updatedFiles);
     onFileChange(updatedFiles);
   };
 
   const handleFileChange = (e) => {
     const newFiles = Array.from(e.target.files);
-    const updatedFiles = [...files, ...newFiles];
+    const maxFileSize = 5 * 1024 * 1024 * 1024; // 5GB
+    const validFiles = [];
+    
+    newFiles.forEach(file => {
+      if (file.size > maxFileSize) {
+        alert(`File ${file.name} is too large. Maximum size is 5GB.`);
+      } else {
+        validFiles.push(file);
+      }
+    });
+    
+    const updatedFiles = [...files, ...validFiles];
     setFiles(updatedFiles);
     onFileChange(updatedFiles);
   };
@@ -62,9 +84,9 @@ const FileUpload = ({ onFileChange, initialFiles }) => {
         <div className="text-center">
           <FaUpload className={`mx-auto text-2xl mb-3 ${isDragging ? 'text-indigo-400' : 'text-gray-500'}`} />
           <p className={`text-sm ${isDragging ? 'text-indigo-400' : 'text-gray-400'}`}>
-            {isDragging ? 'Drop file here' : 'Drag & drop a file or click to browse'}
+            {isDragging ? 'Drop file here (up to 5GB)' : 'Upload survey file up to 5GB'}
           </p>
-          <p className="text-xs text-gray-500 mt-1">Supports: TXT, PDF, DOCX, MD</p>
+          <p className="text-xs text-gray-500 mt-1">Supports: TXT, PDF, DOCX, MD • Maximum 5GB per file</p>
         </div>
       </div>
       <input

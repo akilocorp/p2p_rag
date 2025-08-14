@@ -1,0 +1,96 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Video Generation Configuration Schema",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "ID of the user who owns this configuration"
+    },
+    "bot_name": {
+      "type": "string",
+      "description": "Friendly name for the video generation configuration",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "collection_name": {
+      "type": "string",
+      "description": "Name of the MongoDB collection storing the knowledge base documents",
+      "minLength": 1
+    },
+    "prompt_template": {
+      "type": "string",
+      "description": "Template string with {{context}} and {{query}} placeholders for video generation prompts",
+      "minLength": 1
+    },
+    "is_public": {
+      "type": "boolean",
+      "description": "Whether this configuration can be accessed without authentication",
+      "default": false
+    },
+    "documents": {
+      "type": "array",
+      "description": "List of uploaded document filenames",
+      "items": {
+        "type": "string"
+      }
+    },
+    "config_type": {
+      "type": "string",
+      "enum": ["video_generation"],
+      "description": "Configuration type identifier"
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["Standard"],
+      "description": "Video generation mode (currently only Standard supported)",
+      "default": "Standard"
+    },
+    "duration": {
+      "type": "integer",
+      "enum": [5, 10],
+      "description": "Length of generated video in seconds",
+      "default": 5
+    },
+    "guidance_scale": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Controls how closely the video follows the prompt (0.0 = creative, 1.0 = precise)",
+      "default": 0.5
+    },
+    "negative_prompt": {
+      "type": "string",
+      "description": "Comma-separated string of unwanted elements to exclude from video generation"
+    },
+    "negative_prompt_list": {
+      "type": "array",
+      "description": "Array of negative prompt terms (used for editing interface)",
+      "items": {
+        "type": "string",
+        "enum": [
+          "Blurry",
+          "Cartoonish", 
+          "Unrealistic",
+          "Grainy",
+          "Noisy",
+          "Low contrast",
+          "Distorted",
+          "Pixelated",
+          "Overexposed",
+          "Underexposed",
+          "Motion blur",
+          "Artifacts"
+        ]
+      }
+    }
+  },
+  "required": [
+    "user_id",
+    "bot_name",
+    "collection_name", 
+    "prompt_template",
+    "config_type"
+  ],
+  "additionalProperties": false
+}

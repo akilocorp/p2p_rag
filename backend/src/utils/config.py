@@ -41,7 +41,8 @@ def load_secrets():
         "MAIL_PASSWORD" ,
         "MAIL_DEFAULT_SENDER",
         "SECRET_KEY",
-        "FRONTEND_URL"
+        "FRONTEND_URL",
+        "NOVITA_API_KEY"
 
     ]
 

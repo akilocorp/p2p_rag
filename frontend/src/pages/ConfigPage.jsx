@@ -33,12 +33,12 @@ const FileUpload = ({ onFileChange, initialFiles }) => {
 
   const handleFileChange = (e) => {
     const newFiles = Array.from(e.target.files);
-    const maxFileSize = 1024 * 1024 * 1024; // 1024MB
+    const maxFileSize = 5 * 1024 * 1024 * 1024; // 5GB
     const updatedFiles = [...files];
 
     newFiles.forEach(file => {
       if (file.size > maxFileSize) {
-        alert(`File ${file.name} is too large. Maximum size is 1024MB.`);
+        alert(`File ${file.name} is too large. Maximum size is 5GB.`);
         return;
       }
       updatedFiles.push(file);
@@ -72,9 +72,9 @@ const FileUpload = ({ onFileChange, initialFiles }) => {
         <div className="text-center">
           <FaUpload className={`mx-auto text-2xl mb-3 ${isDragging ? 'text-indigo-400' : 'text-gray-500'}`} />
           <p className={`text-sm ${isDragging ? 'text-indigo-400' : 'text-gray-400'}`}>
-            {isDragging ? 'Drop files here' : 'Drag & drop files or click to browse'}
+            {isDragging ? 'Drop files here (up to 5GB each)' : 'Upload documents up to 5GB each'}
           </p>
-          <p className="text-xs text-gray-500 mt-1">Supports: TXT, PDF, DOCX, MD (Max 1024MB each)</p>
+          <p className="text-xs text-gray-500 mt-1">Supports: TXT, PDF, DOCX, MD • Maximum 5GB per file</p>
         </div>
       </div>
       <input
@@ -167,8 +167,8 @@ const ConfigPage = () => {
 
     const formData = new FormData();
     config.rag_files.forEach(file => {
-      if (file.size > 10 * 1024 * 1024) { // 10MB limit
-        setErrors({ form: `File ${file.name} is too large. Maximum size is 10MB.` });
+      if (file.size > 5 * 1024 * 1024 * 1024) { // 5GB limit
+        setErrors({ form: `File ${file.name} is too large. Maximum size is 5GB.` });
         return;
       }
       formData.append('files', file);
@@ -223,7 +223,7 @@ const ConfigPage = () => {
       if (error.response) {
         errorMessage = error.response.data.error || errorMessage;
         if (error.response.status === 413) {
-          errorMessage = 'File size too large. Maximum size is 10MB.';
+          errorMessage = 'File size too large. Maximum size is 5GB.';
         }
       } else if (error.request) {
         errorMessage = 'No response from server. Please check your connection';

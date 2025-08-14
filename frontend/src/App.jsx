@@ -15,6 +15,8 @@ import EmailVerificationPage from './pages/EmailVerification';
 import SideBar from './components/SideBar'; // Import the SideBar component
 import EditConfigPage from './pages/EditConfigPage';
 import SurveyConfigPage from './pages/SurveyConfigPage';
+import VideoConfigPage from './pages/VideoConfigPage';
+import VideoGenerationPage from './pages/VideoGenerationPage';
 
 // Import the ProtectedRoute component
 import ProtectedRoute from './components/ProtectedRoute';
@@ -55,7 +57,9 @@ function App() {
             {}
             <Route path="/config" element={<ConfigPage />} />
             <Route path="/survey-config" element={<SurveyConfigPage />} />
+            <Route path="/video-config" element={<VideoConfigPage />} />
             <Route path="/edit-config" element={<EditConfigPage />} />
+            <Route path="/video-generation/:configId" element={<VideoGenerationPage />} />
             <Route path="/config_list" element={<ConfigList />} />
 
           </Route>

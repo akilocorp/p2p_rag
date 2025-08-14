@@ -1,0 +1,23 @@
+{
+  "user_id": "user_12345",
+  "bot_name": "Mitochondria Video Generator",
+  "collection_name": "biology_knowledge_base",
+  "prompt_template": "Create an educational video showing {{context}} based on the query: {{query}}. Focus on the cellular structure and biological processes. Make it scientifically accurate and visually engaging for students.",
+  "is_public": true,
+  "documents": [
+    "mitochondria_structure.pdf",
+    "cellular_respiration.docx",
+    "biology_textbook_chapter12.pdf"
+  ],
+  "config_type": "video_generation",
+  "mode": "Standard",
+  "duration": 10,
+  "guidance_scale": 0.7,
+  "negative_prompt": "Blurry, Cartoonish, Unrealistic, Low contrast",
+  "negative_prompt_list": [
+    "Blurry",
+    "Cartoonish", 
+    "Unrealistic",
+    "Low contrast"
+  ]
+}

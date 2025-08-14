@@ -23,6 +23,8 @@ from routes.chat_routes import chat_bp
 from routes.edit_config_routes import edit_config_bp
 from routes.survey_chat_routes import survey_chat_bp
 from routes.survey_config_routes import survey_config_bp
+from routes.video_config_routes import video_config_bp
+from routes.video_generation_routes import video_generation_bp
 from flask_mail import Mail
 
 mail = Mail()
@@ -36,8 +38,8 @@ def create_app():
     app = Flask(__name__)
     CORS(app, resources={r"/api/*": {"origins": ["*"], "supports_credentials": True, "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}})
 
-    # Set the maximum file upload size to 1GB to match the frontend
-    app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024
+    # Set the maximum file upload size to 5GB to match the frontend
+    app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024 * 1024
 
 
     
@@ -106,6 +108,8 @@ def create_app():
     app.register_blueprint(edit_config_bp, url_prefix='/api')
     app.register_blueprint(survey_chat_bp, url_prefix='/api')
     app.register_blueprint(survey_config_bp, url_prefix='/api')
+    app.register_blueprint(video_config_bp, url_prefix='/api')
+    app.register_blueprint(video_generation_bp, url_prefix='/api')
 
     
     # A simple health check endpoint

@@ -1,4 +1,4 @@
-import { FaCog, FaPlus, FaRobot, FaSpinner, FaTimes } from 'react-icons/fa';
+import { FaCog, FaPlus, FaRobot, FaSpinner, FaTimes, FaVideo } from 'react-icons/fa';
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import UserInfo from '../components/UserInfo';
@@ -28,18 +28,25 @@ const ConfigItem = ({ config, onSelect, onEdit }) => {
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-lg font-bold text-white truncate">{config.bot_name}</h3>
-          <p className="text-sm text-gray-400 mt-1">Model: {config.model_name}</p>
+          <p className="text-sm text-gray-400 mt-1">
+            {config.config_type === 'video_generation' 
+              ? `Mode: ${config.mode || 'Standard'} • Duration: ${config.duration || 5}s`
+              : `Model: ${config.model_name}`
+            }
+          </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {isHovered && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-xl pointer-events-none">
                 <div className="px-3 py-1 text-xs font-medium bg-indigo-500/90 text-white rounded-full">
-                  Click to chat
+                  {config.config_type === 'video_generation' ? 'Click to generate' : 'Click to chat'}
                 </div>
               </div>
             )}
             <span className="px-2 py-1 text-xs rounded-full bg-gray-700/50 text-gray-300">
               {config.config_type === 'survey' 
                 ? (config.creativity_rate ? `Creativity: ${config.creativity_rate}/5` : 'Creativity: 3/5')
+                : config.config_type === 'video_generation'
+                ? `Guidance: ${config.guidance_scale || 0.5}`
                 : (config.temperature ? `Temp: ${config.temperature}` : 'Default temp')
               }
             </span>
@@ -51,6 +58,11 @@ const ConfigItem = ({ config, onSelect, onEdit }) => {
           {config.config_type === 'survey' && (
             <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-500/10 text-green-400 border border-green-500/20">
               Survey
+            </span>
+          )}
+          {config.config_type === 'video_generation' && (
+            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
+              Video
             </span>
           )}
         </div>
@@ -81,15 +93,17 @@ const ConfigListPage = () => {
     const loadPageData = async () => {
       setIsLoading(true);
       try {
-        const [normalConfigsResponse, surveyConfigsResponse] = await Promise.all([
+        const [normalConfigsResponse, surveyConfigsResponse, videoConfigsResponse] = await Promise.all([
           apiClient.get('/config_list'),
-          apiClient.get('/survey_config_list')
+          apiClient.get('/survey_config_list'),
+          apiClient.get('/video_config_list')
         ]);
 
         const normalConfigs = normalConfigsResponse.data.configs || [];
         const surveyConfigs = surveyConfigsResponse.data.configs || [];
+        const videoConfigs = videoConfigsResponse.data.configs || [];
 
-        setConfigs([...normalConfigs, ...surveyConfigs]);
+        setConfigs([...normalConfigs, ...surveyConfigs, ...videoConfigs]);
       } catch (err) {
         console.error('Failed to load configurations:', err);
         setError('Failed to load configurations. Please try again later.');
@@ -111,10 +125,13 @@ const ConfigListPage = () => {
       return;
     }
 
-    navigate(config.config_type === 'survey' 
-      ? `/survey-chat/${config.config_id}`
-      : `/chat/${config.config_id}`
-    );
+    if (config.config_type === 'survey') {
+      navigate(`/survey-chat/${config.config_id}`);
+    } else if (config.config_type === 'video_generation') {
+      navigate(`/video-generation/${config.config_id}`);
+    } else {
+      navigate(`/chat/${config.config_id}`);
+    }
   };
 
   const onEdit = (config) => {
@@ -281,6 +298,22 @@ const ConfigListPage = () => {
                 <div>
                   <h3 className="text-lg font-semibold text-white">Survey Assistant</h3>
                   <p className="text-sm text-gray-400 mt-1">Initiates conversations and guides users</p>
+                </div>
+              </button>
+              
+              <button
+                onClick={() => {
+                  setShowAssistantTypeModal(false);
+                  navigate('/video-config');
+                }}
+                className="p-6 bg-gray-900/50 border border-gray-700 hover:border-purple-500 hover:bg-gray-700 rounded-xl text-left transition-all duration-300 group flex items-start space-x-4"
+              >
+                <div className="p-3 bg-purple-500/10 rounded-lg text-purple-400 group-hover:bg-purple-500/20 transition-colors">
+                  <FaVideo className="text-xl" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Video Generator</h3>
+                  <p className="text-sm text-gray-400 mt-1">Creates AI-generated videos from knowledge base</p>
                 </div>
               </button>
             </div>

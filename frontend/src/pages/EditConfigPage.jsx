@@ -98,12 +98,12 @@ const EditConfigPage = () => {
   };
 
   const handleFileChange = (newFiles) => {
-    const maxFileSize = 1024 * 1024 * 1024; // 1GB
+    const maxFileSize = 5 * 1024 * 1024 * 1024; // 5GB
     const validFiles = [];
 
     newFiles.forEach(file => {
       if (file.size > maxFileSize) {
-        alert(`File ${file.name} is too large. Maximum size is 1024MB.`);
+        alert(`File ${file.name} is too large. Maximum size is 5GB.`);
       } else {
         validFiles.push(file);
       }
@@ -606,9 +606,9 @@ const EditConfigPage = () => {
                 <div className="text-center">
                   <FaUpload className="mx-auto text-2xl mb-3 text-gray-500" />
                   <p className="text-xs text-gray-400">
-                    Drag & drop files or click to browse
+                    Upload documents up to 5GB each
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">Supports: TXT, PDF, DOCX, MD (Max 1024MB each)</p>
+                  <p className="text-xs text-gray-500 mt-1">Supports: TXT, PDF, DOCX, MD • Maximum 5GB per file</p>
                 </div>
                 <input
                   type="file"
