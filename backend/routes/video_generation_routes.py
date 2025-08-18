@@ -13,6 +13,54 @@ logger = logging.getLogger(__name__)
 
 video_generation_bp = Blueprint('video_generation_routes', __name__)
 
+import os
+import subprocess
+from datetime import datetime
+
+GENERATED_DIR = "/app/generated"
+os.makedirs(GENERATED_DIR, exist_ok=True)
+
+def stitch_images_to_video(image_urls, output_basename="storyboard"):
+    try:
+        tmp_dir = os.path.join(GENERATED_DIR, f"{output_basename}_{int(time.time())}")
+        os.makedirs(tmp_dir, exist_ok=True)
+        local_paths = []
+        for idx, url in enumerate(image_urls, start=1):
+            r = requests.get(url, timeout=30)
+            r.raise_for_status()
+            img_path = os.path.join(tmp_dir, f"frame_{idx:02d}.png")
+            with open(img_path, "wb") as f:
+                f.write(r.content)
+            local_paths.append(img_path)
+        # Create a list file for ffmpeg
+        list_path = os.path.join(tmp_dir, "frames.txt")
+        with open(list_path, "w") as f:
+            for p in local_paths:
+                f.write(f"file '{p}'\n")
+                f.write("duration 1.5\n")
+        # Ensure last frame duration counts
+        if local_paths:
+            with open(list_path, "a") as f:
+                f.write(f"file '{local_paths[-1]}'\n")
+        out_path = os.path.join(GENERATED_DIR, f"{output_basename}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.mp4")
+        cmd = [
+            "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", list_path,
+            "-vf", "scale=1024:-2,format=yuv420p", "-pix_fmt", "yuv420p", out_path
+        ]
+        subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return out_path
+    except Exception as e:
+        logger.error(f"❌ Failed to stitch images to video: {e}")
+        return None
+
+@video_generation_bp.route('/generated/<path:filename>', methods=['GET'])
+def serve_generated_file(filename):
+    try:
+        from flask import send_from_directory
+        return send_from_directory(GENERATED_DIR, filename, as_attachment=False)
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 404
+
 def filtered_retriever(query, config_id):
     """Perform HNSW vector search with config-based filtering on shared collection."""
     try:
@@ -90,43 +138,36 @@ def inject_template_variables(template, context, query):
 def create_advanced_video_prompt(context, query):
     """Create an advanced video prompt that converts knowledge into visual scenes."""
     try:
-        # If no context, create a basic prompt from the query
-        if not context.strip():
-            logger.warning(f"⚠️ No context found for advanced template, using query-based prompt")
-            return f"Create an educational video about {query}. Transform the concept into clear visual scenes with engaging demonstrations and explanations."
-        
-        # Extract key concepts from context for video scenes
-        context_summary = context[:800] if len(context) > 800 else context
-        
-        # Optimized advanced template for educational content with artistic model
-        # Clean up context and make it concise for video generation
-        clean_context = context_summary.replace('\n', ' ').replace('\r', ' ').strip()
-        clean_context = ' '.join(clean_context.split())  # Remove extra whitespace
-        
-        # Remove problematic Unicode characters that break JSON parsing
-        clean_context = clean_context.replace('\u2019', "'").replace('\u201c', '"').replace('\u201d', '"')
-        clean_context = clean_context.replace('\u2013', '-').replace('\u2014', '-')
-        
-        # Keep context shorter for API limits
-        if len(clean_context) > 250:
-            clean_context = clean_context[:250] + "..."
-        
-        # Create optimized educational prompt with specific keywords for better content matching
-        educational_keywords = "educational diagram, technical illustration, step-by-step tutorial, whiteboard explanation, infographic style"
-        
-        final_prompt = f"Educational tutorial video: {query}. Create {educational_keywords} showing {clean_context}. Display as clear diagrams, charts, text overlays, and visual explanations. Professional educational content, not abstract art. Focus on information visualization and learning materials."
-        
-        logger.info(f"🎨 Advanced prompt created using hardcoded template")
+        # Clean inputs
+        q = ' '.join(query.replace('\n', ' ').split()).strip()
+        ctx = ' '.join(context.replace('\n', ' ').split()).strip() if context else ''
+        if len(ctx) > 200:
+            ctx = ctx[:200] + '...'
+
+        # Structured, scene-based prompt to avoid abstract/blank outputs
+        final_prompt = (
+            f"Educational storyboard video about: {q}. "
+            f"Strict visual rules: white background, black vector outlines, readable English labels, high contrast, no gradients, no abstract art, no blank screens. "
+            f"Use large title text overlays and arrows where helpful. "
+            f"If context is provided, align content with: {ctx if ctx else 'N/A'}.\n"
+            f"SCENE 1/3 (Intro, 2-3s): Title card with the main topic. Simple icon or diagram. Label key terms.\n"
+            f"SCENE 2/3 (Explanation, 2-3s): Step-by-step diagram showing the core process. Use arrows and numbered labels.\n"
+            f"SCENE 3/3 (Outcome, 2-3s): Summarize the result with a simple labeled diagram or bullet overlay.\n"
+            f"Camera: static shots, no fancy transitions.\n"
+            f"Text: bold, high-contrast, easy to read.\n"
+            f"Ensure each scene has meaningful visible content—never produce empty or abstract frames."
+        )
+
+        logger.info("🎨 Advanced prompt created (structured scenes)")
         logger.info(f"📝 Final prompt length: {len(final_prompt)} chars")
-        logger.info(f"🎬 User query: '{query}'")
-        logger.info(f"📚 Context length: {len(context)} chars")
-        
+        logger.info(f"🎬 User query: '{q}'")
+        logger.info(f"📚 Context length: {len(ctx)} chars")
+
         return final_prompt
-        
     except Exception as e:
         logger.error(f"❌ Advanced prompt creation failed: {str(e)}")
         # Fallback to simple prompt
-        return f"Create an educational video about {query}. Transform the concept into clear visual scenes."
+        return f"Educational storyboard video about: {query}. White background, black outlines, labeled diagrams, three scenes (intro, explanation, outcome)."
 
 def call_novita_kling_api(prompt, mode, duration, guidance_scale, negative_prompt):
     """Call Novita AI Kling v1.6 Text-to-Video API."""
@@ -157,52 +198,71 @@ def call_novita_kling_api(prompt, mode, duration, guidance_scale, negative_promp
         }
         
         # Clean up negative prompt (ensure it's a string, not empty if not provided)
-        clean_negative_prompt = negative_prompt.strip() if negative_prompt else "low quality, blurry, distorted"
+        base_neg = "low quality, blurry, distorted, black screen, empty frame, no content, blank"
+        clean_negative_prompt = (negative_prompt.strip() + ", " + base_neg) if negative_prompt else base_neg
+        # Calculate frames at 24 fps and clamp to API range [8, 64]
+        frames = 24 * int(duration)
+        frames = max(8, min(64, frames))
         
-        payload = {
-            "model_name": "darkSushiMixMix_225D_64380.safetensors",
-            "height": 576,
-            "width": 1024,
-            "steps": 30,
-            "seed": -1,
-            "prompts": [
-                {
-                    "frames": 32,
-                    "prompt": prompt.strip()
-                }
-            ],
-            "negative_prompt": clean_negative_prompt
-        }
-        
-        logger.info(f"🚀 Calling Novita Kling API with payload: {json.dumps(payload, indent=2)}")
-        
-        # Make API request
-        response = requests.post(url, headers=headers, json=payload, timeout=30)
-        
-        # Log response details for debugging
-        logger.info(f"📡 API Response Status: {response.status_code}")
-        logger.info(f"📡 API Response Headers: {dict(response.headers)}")
-        
-        if not response.ok:
-            try:
-                error_details = response.json()
-                logger.error(f"❌ API Error Response: {json.dumps(error_details, indent=2)}")
-            except:
-                logger.error(f"❌ API Error Response (raw): {response.text}")
+        # Clamp guidance scale to API range [1, 30]
+        safe_guidance = max(1.0, min(30.0, float(guidance_scale)))
+ 
+        # Try preferred models in order with a fallback
+        preferred_models = ["kling-v1.6", "darkSushiMixMix_225D_64380.safetensors"]
+        last_error = None
+        for model_name in preferred_models:
+            payload = {
+                "model_name": model_name,
+                "height": 512,
+                "width": 512,
+                "steps": 20,
+                "seed": -1,
+                "prompts": [
+                    {
+                        "frames": frames,
+                        "prompt": prompt.strip()
+                    }
+                ],
+                "negative_prompt": clean_negative_prompt,
+                "guidance_scale": round(safe_guidance, 2)
+            }
             
-            raise Exception(f"Novita API returned {response.status_code}: {response.text}")
-        
-        result = response.json()
-        logger.info(f"✅ API Success Response: {json.dumps(result, indent=2)}")
-        
-        task_id = result.get("task_id")
-        
-        if not task_id:
-            raise Exception("No task_id returned from Novita API")
-        
-        logger.info(f"✅ Video generation task created: {task_id}")
-        return task_id
-        
+            logger.info(f"🚀 Calling Novita Kling API with payload: {json.dumps(payload, indent=2)}")
+            response = requests.post(url, headers=headers, json=payload, timeout=30)
+            logger.info(f"📡 API Response Status: {response.status_code}")
+            logger.info(f"📡 API Response Headers: {dict(response.headers)}")
+            
+            if response.ok:
+                result = response.json()
+                logger.info(f"✅ API Success Response: {json.dumps(result, indent=2)}")
+                task_id = result.get("task_id")
+                if not task_id:
+                    last_error = Exception("No task_id returned from Novita API")
+                    continue
+                logger.info(f"✅ Video generation task created: {task_id}")
+                return task_id
+            else:
+                try:
+                    error_details = response.json()
+                    logger.error(f"❌ API Error Response: {json.dumps(error_details, indent=2)}")
+                    last_error = Exception(f"{error_details}")
+                    # If checkpoint not allowed, try next model
+                    if isinstance(error_details, dict):
+                        meta = error_details.get("metadata", {})
+                        details = meta.get("details", "")
+                        if "not allowed" in str(details).lower():
+                            logger.info("🔁 Retrying with fallback model...")
+                            continue
+                except Exception:
+                    logger.error(f"❌ API Error Response (raw): {response.text}")
+                    last_error = Exception(response.text)
+                # If other error, do not retry further
+                break
+        # If we exhaust models, raise last error
+        if last_error:
+            raise last_error
+        raise Exception("Unknown video API error")
+         
     except requests.exceptions.RequestException as e:
         logger.error(f"❌ Novita API request failed: {str(e)}")
         raise Exception(f"Failed to call Novita API: {str(e)}")
@@ -376,6 +436,8 @@ def generate_video(config_id):
             return jsonify(response_data), 200
         elif result["status"] == "failed":
             logger.error(f"❌ Video generation failed for config {config_id}: {result.get('reason')}")
+            # Fallback: try fetching storyboard images from the chat route fallback (if any) is not available here.
+            # For API, we can at least return a clear message; stitching requires images.
             return jsonify(response_data), 500
         elif result["status"] == "timeout":
             logger.warning(f"⏰ Video generation timeout for config {config_id}")

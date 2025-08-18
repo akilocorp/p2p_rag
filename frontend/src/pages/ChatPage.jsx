@@ -9,9 +9,9 @@ import apiClient from '../api/apiClient';
 import axios from 'axios';
 import { marked } from 'marked';
 
-const ChatMessage = ({ message }) => {
+const ChatMessage = ({ message, onOpenMedia, onDownloadMedia }) => {
 
-  const { sender, text, isTyping } = message;
+  const { sender, text, isTyping, media } = message;
   const isUser = sender === 'user';
 
   const createMarkup = (markdownText) => {
@@ -39,10 +39,78 @@ const ChatMessage = ({ message }) => {
             <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '300ms' }} />
           </div>
         ) : (
-          <div
-            className="prose prose-invert max-w-none text-gray-100"
-            dangerouslySetInnerHTML={createMarkup(text)}
-          />
+          <>
+            <div
+              className="prose prose-invert max-w-none text-gray-100"
+              dangerouslySetInnerHTML={createMarkup(text)}
+            />
+            {Array.isArray(media) && media.length > 0 && (
+              <div className="mt-3 space-y-3">
+                {media.map((m, idx) => (
+                  <div key={idx}>
+                    {m.type === 'image' && (
+                      <div>
+                        <img
+                          src={m.url}
+                          alt="generated"
+                          className="rounded-lg border border-gray-700 max-h-64 w-auto object-contain cursor-zoom-in"
+                          onClick={() => onOpenMedia?.(m)}
+                        />
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            onClick={() => onOpenMedia?.(m)}
+                            className="text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-100 border border-gray-600"
+                          >
+                            Open
+                          </button>
+                          <button
+                            onClick={() => onDownloadMedia?.(m)}
+                            className="text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-100 border border-gray-600"
+                          >
+                            Download
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {m.type === 'video' && (
+                      <div>
+                        <video
+                          controls
+                          className="rounded-lg border border-gray-700 max-w-md"
+                          onError={(e) => {
+                            const container = e.currentTarget.parentElement;
+                            const note = document.createElement('div');
+                            note.className = 'text-xs text-gray-400 mt-2';
+                            note.innerText = 'If the video does not play here, use Open to view it in a new tab or Download to save locally.';
+                            container && container.appendChild(note);
+                          }}
+                        >
+                          <source src={m.url} type={m.video_type || 'video/mp4'} />
+                        </video>
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            onClick={() => onOpenMedia?.(m)}
+                            className="text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-100 border border-gray-600"
+                          >
+                            Open
+                          </button>
+                          <button
+                            onClick={() => onDownloadMedia?.(m)}
+                            className="text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-100 border border-gray-600"
+                          >
+                            Download
+                          </button>
+                          {m.ttl && (
+                            <span className="text-[10px] text-gray-500 self-center">Expires in ~{Math.round((parseInt(m.ttl, 10) || 3600)/60)} min</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
 
       </div>
@@ -73,6 +141,7 @@ const ChatPage = () => {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const isAuthenticated = !!localStorage.getItem('jwtToken');
+  const [selectedMedia, setSelectedMedia] = useState(null);
 
   const handleNewChat = () => {
     setIsInitializing(true);
@@ -80,6 +149,48 @@ const ChatPage = () => {
     setInput('');
     setError(null);
     setTimeout(() => setIsInitializing(false), 300);
+  };
+
+  const handleOpenMedia = (media) => {
+    setSelectedMedia(media);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedMedia(null);
+  };
+
+  const handleDownloadMedia = async (media) => {
+    try {
+      // Try to fetch and download as blob to ensure local save
+      const response = await fetch(media.url, { mode: 'cors' });
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const defaultName = media.type === 'video' ? 'generated.mp4' : 'generated.png';
+      const urlName = (() => {
+        try {
+          const u = new URL(media.url);
+          const last = u.pathname.split('/').filter(Boolean).pop();
+          return last || defaultName;
+        } catch {
+          return defaultName;
+        }
+      })();
+      a.href = url;
+      a.download = urlName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      // Fallback: attempt direct download via anchor (may open tab if server disallows CORS)
+      const a = document.createElement('a');
+      a.href = media.url;
+      a.download = media.type === 'video' ? 'generated.mp4' : 'generated.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
   };
 
   useEffect(() => {
@@ -132,7 +243,8 @@ const ChatPage = () => {
         const formattedMessages = response.data.history.map(item => ({
           sender: item.type === 'human' ? 'user' : 'ai',
           text: item.data?.content || '',
-          sources: item.data?.sources || []
+          sources: item.data?.sources || [],
+          media: item.data?.additional_kwargs?.media || []
         }));
         setMessages(formattedMessages);
       } catch (error) {
@@ -219,7 +331,8 @@ const ChatPage = () => {
       const aiResponse = {
             sender: 'ai',
             text: response.data.response,
-            sources: response.data.sources || []
+            sources: response.data.sources || [],
+            media: response.data.media || []
         };
 
      setMessages(prev => {
@@ -346,7 +459,7 @@ const ChatPage = () => {
             )}
 
             {messages.map((msg, index) => (
-              <ChatMessage key={index} message={msg} />
+              <ChatMessage key={index} message={msg} onOpenMedia={handleOpenMedia} onDownloadMedia={handleDownloadMedia} />
             ))}
 
             {isLoading && messages[messages.length - 1]?.sender !== 'ai' && (
@@ -356,6 +469,36 @@ const ChatPage = () => {
             <div ref={messagesEndRef} />
           </div>
         </main>
+
+        {/* Fullscreen Media Modal */}
+        {selectedMedia && (
+          <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={handleCloseModal}>
+            <div className="relative max-w-[95vw] max-h-[95vh]" onClick={(e) => e.stopPropagation()}>
+              <button
+                className="absolute -top-3 -right-3 bg-gray-800 text-white border border-gray-700 rounded-full px-3 py-1 text-sm"
+                onClick={handleCloseModal}
+              >
+                Close
+              </button>
+              {selectedMedia.type === 'image' && (
+                <img src={selectedMedia.url} alt="preview" className="max-w-[95vw] max-h-[85vh] object-contain rounded" />
+              )}
+              {selectedMedia.type === 'video' && (
+                <video controls autoPlay className="max-w-[95vw] max-h-[85vh] rounded">
+                  <source src={selectedMedia.url} type="video/mp4" />
+                </video>
+              )}
+              <div className="flex gap-2 mt-3 justify-end">
+                <button
+                  className="text-xs px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-100 border border-gray-600"
+                  onClick={() => handleDownloadMedia(selectedMedia)}
+                >
+                  Download
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <footer className="p-4 bg-gray-900 border-t border-gray-800 z-0">
           <div className="container mx-auto max-w-4xl">

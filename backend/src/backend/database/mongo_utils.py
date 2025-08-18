@@ -22,13 +22,18 @@ def get_mongo_db_connection(mongo_uri: str, db_name: str, collection_name: str):
             replica_set = parsed_uri.hostname.split(',')[0].split('/')[-1]
         
         # Set up the client with proper read preferences for Atlas
+        # Only include replicaSet in kwargs if we actually have a value
+        client_kwargs = dict(
+            serverSelectionTimeoutMS=5000,
+            retryWrites=True,
+            w="majority",
+        )
+        if replica_set:
+            client_kwargs["replicaSet"] = replica_set
+        
         mongo_client = pymongo.MongoClient(
             mongo_uri,
-            serverSelectionTimeoutMS=5000,
-            replicaSet=replica_set,
-            readPreference="secondaryPreferred",  # Use secondary nodes first
-            retryWrites=True,
-            w="majority"  # Wait for majority of nodes to confirm write
+            **client_kwargs,
         )
         
         # Try to establish connection

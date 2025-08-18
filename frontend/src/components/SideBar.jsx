@@ -225,7 +225,7 @@ export const ChatSidebar = ({
                             activeChatId === session.session_id ? 'text-white' : 'text-gray-300'
                           }`}>
 
-                            {session.session_id ? `${session.session_id} - ${session.title}` : "New Chat"}
+                            {session.title?.trim() || "New Chat"}
                           </p>
                           <p className="text-xs text-gray-500 mt-1">
                             {new Date(session.timestamp).toLocaleString('default', {

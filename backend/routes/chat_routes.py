@@ -11,11 +11,13 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_mongodb.vectorstores import MongoDBAtlasVectorSearch
 from langchain_mongodb.chat_message_histories import MongoDBChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
-from langchain_core.messages import BaseMessage, messages_from_dict, message_to_dict, AIMessage
+from langchain_core.messages import BaseMessage, messages_from_dict, message_to_dict, AIMessage, HumanMessage
 from models.config import Config
 from bson import ObjectId
 from langchain_community.chat_models import ChatTongyi
 from langchain_deepseek import ChatDeepSeek
+import requests
+from routes import video_generation_routes as video_gen
 
 logger = logging.getLogger(__name__)
 chat_bp = Blueprint('chat_routes', __name__)
@@ -188,6 +190,220 @@ def chat(config_id, chat_id):
             except Exception as e:
                 return jsonify(message="Authorization error: " + str(e)), 401
         
+        # Create or get chat history early for custom branches
+        history = get_session_history(chat_id, user_id_for_history, config_id)
+
+        # --- Intent detection for media generation ---
+        def detect_generation_intent(text: str):
+            text_lower = text.lower()
+            # Trigger video if user mentions 'video' or 'clip' in any phrasing
+            if ("video" in text_lower) or ("clip" in text_lower):
+                return "video"
+            if any(k in text_lower for k in [
+                "generate an image", "generate a photo", "create an image", "create a photo", "make an image", "picture of", "image of", "photo of", "diagram", "illustration"
+            ]):
+                return "image"
+            return None
+
+        intent = detect_generation_intent(user_input)
+
+        # --- Handle video generation intent ---
+        if intent == "video":
+            try:
+                # Persist the user's request in history
+                history.add_message(HumanMessage(content=user_input))
+                # Ensure API key exists
+                if not current_app.config.get("NOVITA_API_KEY"):
+                    msg = "Video generation is not configured. Please set NOVITA_API_KEY to enable this feature."
+                    history.add_message(AIMessage(content=msg))
+                    return jsonify({"response": msg}), 501
+                # For video, ignore KB context to avoid off-topic visuals
+                docs = []
+                context = ""
+                # Build final prompt (use advanced template for better visuals)
+                final_prompt = video_gen.create_advanced_video_prompt(context, user_input)
+                
+                # Parse desired duration from user input; map to allowed {5,10}
+                requested_seconds = None
+                m = re.search(r"(\d+)\s*(seconds?|secs?|s)\b", user_input.lower())
+                if m:
+                    try:
+                        requested_seconds = int(m.group(1))
+                    except ValueError:
+                        requested_seconds = None
+                duration = 5 if (not requested_seconds or requested_seconds < 8) else 10
+                # Call Novita API
+                task_id = video_gen.call_novita_kling_api(
+                    prompt=final_prompt,
+                    mode="Standard",
+                    duration=duration,
+                    guidance_scale=0.5,
+                    negative_prompt=""
+                )
+                result = video_gen.poll_novita_task_result(task_id)
+
+                sources = []
+
+                if result.get("status") == "success":
+                    video_url = result.get("video_url")
+                    reply_text = "Here is the generated video based on your request."
+                    media_payload = [{
+                        "type": "video",
+                        "url": video_url,
+                        "task_id": result.get("task_id"),
+                        "ttl": result.get("ttl"),
+                        "video_type": result.get("video_type", "mp4")
+                    }]
+                    history.add_message(AIMessage(content=reply_text, additional_kwargs={"media": media_payload}))
+                    return jsonify({
+                        "response": reply_text,
+                        "media": media_payload,
+                        "sources": sources,
+                        "metadata": {
+                            "documents_found": len(docs),
+                            "context_length": len(context),
+                            "ttl": result.get("ttl"),
+                            "video_type": result.get("video_type", "mp4")
+                        }
+                    })
+                else:
+                    fail_reason = result.get("reason") or result.get("message") or "Unknown error"
+                    # Attempt storyboard image fallback
+                    try:
+                        openai_key = current_app.config.get("OPENAI_API_KEY")
+                        if openai_key:
+                            import requests as _requests
+                            headers = {"Authorization": f"Bearer {openai_key}", "Content-Type": "application/json"}
+                            images = []
+                            for idx in range(1, 4):
+                                img_prompt = (
+                                    f"Storyboard frame {idx}/3 for: {user_input}. "
+                                    f"Educational diagram, labels, clear contrast, no blur."
+                                )
+                                payload = {"model": "dall-e-3", "prompt": img_prompt, "size": "1024x1024"}
+                                resp = _requests.post("https://api.openai.com/v1/images/generations", headers=headers, json=payload, timeout=60)
+                                if resp.ok:
+                                    data = resp.json()
+                                    url = None
+                                    try:
+                                        url = data["data"][0].get("url")
+                                    except Exception:
+                                        url = None
+                                    if not url:
+                                        b64 = data.get("data", [{}])[0].get("b64_json")
+                                        if b64:
+                                            url = f"data:image/png;base64,{b64}"
+                                    if url:
+                                        images.append({"type": "image", "url": url})
+                            if images:
+                                fallback_msg = f"Video generation failed ({fail_reason}). I created a 3-frame storyboard instead."
+                                history.add_message(AIMessage(content=fallback_msg, additional_kwargs={"media": images}))
+                                return jsonify({"response": fallback_msg, "media": images, "sources": []}), 200
+                    except Exception:
+                        pass
+                    fail_msg = f"Video generation failed: {fail_reason}."
+                    history.add_message(AIMessage(content=fail_msg, additional_kwargs={"media": []}))
+                    return jsonify({
+                        "response": fail_msg,
+                        "sources": sources,
+                        "metadata": {"status": result.get("status", "failed"), "reason": fail_reason}
+                    }), 502
+            except Exception as e:
+                logger.error(f"Video generation branch failed: {e}", exc_info=True)
+                err_msg = f"Video generation failed: {str(e)}"
+                history.add_message(AIMessage(content=err_msg, additional_kwargs={"media": []}))
+                return jsonify({"response": err_msg, "metadata": {"reason": str(e)} }), 502
+
+        # --- Handle image generation intent (OpenAI Images) ---
+        if intent == "image":
+            try:
+                # Persist the user's request in history
+                history.add_message(HumanMessage(content=user_input))
+                # Retrieve context to enrich the prompt
+                db = current_app.config['MONGO_DB']
+                shared_collection_name = "documents"
+                vector_store = MongoDBAtlasVectorSearch(
+                    collection=db[shared_collection_name],
+                    embedding=current_app.config['EMBEDDINGS'],
+                    index_name="hnsw_index",
+                    text_key="text",
+                    embedding_key="embedding"
+                )
+                docs = vector_store.similarity_search(query=user_input, k=3, pre_filter={"config_id": {"$eq": config_id}})
+                context = "\n\n".join(doc.page_content for doc in docs)
+
+                # Build image prompt
+                context_snippet = (context[:250] + "...") if context and len(context) > 250 else (context or "")
+                image_prompt = (
+                    f"Create a clean, educational illustration for: {user_input}. "
+                    f"Use clear labeling, sharp lines, and good readability. "
+                    f"Focus on accuracy. Reference details: {context_snippet}"
+                ).strip()
+
+                openai_key = current_app.config.get("OPENAI_API_KEY")
+                if not openai_key:
+                    msg = "Image generation requires OPENAI_API_KEY to be configured."
+                    history.add_message(AIMessage(content=msg))
+                    return jsonify({"response": msg}), 500
+
+                headers = {
+                    "Authorization": f"Bearer {openai_key}",
+                    "Content-Type": "application/json"
+                }
+                payload = {
+                    "model": "dall-e-3",
+                    "prompt": image_prompt,
+                    "size": "1024x1024"
+                }
+                resp = requests.post("https://api.openai.com/v1/images/generations", headers=headers, json=payload, timeout=60)
+                if not resp.ok:
+                    logger.error(f"OpenAI Images error: {resp.status_code} {resp.text}")
+                    msg = "The image generation service returned an error. Please try again."
+                    history.add_message(AIMessage(content=msg))
+                    return jsonify({"response": msg}), 502
+                data = resp.json()
+                image_url = None
+                try:
+                    image_url = data["data"][0].get("url")
+                except Exception:
+                    image_url = None
+
+                # Fallback: if URL not provided, try b64
+                if not image_url:
+                    try:
+                        b64 = data["data"][0].get("b64_json")
+                        if b64:
+                            image_url = f"data:image/png;base64,{b64}"
+                    except Exception:
+                        pass
+
+                sources = []
+                for doc in docs:
+                    sources.append({
+                        "source": doc.metadata.get("original_file", doc.metadata.get("source", "Unknown")),
+                        "page_content": doc.page_content[:200] + ("..." if len(doc.page_content) > 200 else ""),
+                        "chunk_index": doc.metadata.get("chunk_index", 0)
+                    })
+
+                if image_url:
+                    reply_text = "Here is an image I generated based on your request."
+                    media_payload = [{"type": "image", "url": image_url}]
+                    history.add_message(AIMessage(content=reply_text, additional_kwargs={"media": media_payload}))
+                    return jsonify({
+                        "response": reply_text,
+                        "media": media_payload,
+                        "sources": sources
+                    })
+                else:
+                    msg = "I couldn't retrieve the generated image. Please try again."
+                    history.add_message(AIMessage(content=msg, additional_kwargs={"media": []}))
+                    return jsonify({"response": msg}), 500
+            except Exception as e:
+                logger.error(f"Image generation branch failed: {e}", exc_info=True)
+                err_msg = "Sorry, image generation encountered an error."
+                history.add_message(AIMessage(content=err_msg))
+                return jsonify({"response": err_msg}), 500
+
         db = current_app.config['MONGO_DB']
         # Use single shared collection for all configs (cost-effective for MongoDB Atlas)
         shared_collection_name = "documents"
@@ -237,30 +453,49 @@ def chat(config_id, chat_id):
         
 
         
-        system_prompt_template = re.sub(r'Question:.*', '', config_document.get("prompt_template", "")).strip()
+        raw_template = config_document.get("prompt_template", "")
+        # Remove placeholder lines and adjust phrasing
+        cleaned_template = re.sub(r"(?im)^.*\bContext\s*:\s*\{\{\s*context\s*\}\}.*\n?", "", raw_template)
+        cleaned_template = re.sub(r"(?is)Question\s*:.*", "", cleaned_template)
+        cleaned_template = re.sub(r"(?is)Answer\s*:.*", "", cleaned_template)
+        cleaned_template = re.sub(r"(?i)based on the context provided", "using the reference material when relevant", cleaned_template)
+        cleaned_template = re.sub(r"(?i)cite or reference the context", "cite source titles or filenames when appropriate; do not mention 'context' or 'reference material' in answers", cleaned_template)
+        cleaned_template = cleaned_template.strip()
+
+        system_message = (
+            cleaned_template
+            + "\n\nGuidelines: Maintain a professional, polite tone. Do not mention 'context' or 'reference material' explicitly in your answers."
+            + "\n\nReference material:\n{context}"
+        )
+
         prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt_template + "\n\nContext:\n{context}"),
+            ("system", system_message),
             MessagesPlaceholder(variable_name="history"),
             ("human", "{question}")
         ])
         
-        model_name = config_document.get("model_name")
+        # Add safe defaults to avoid AttributeError when model_name is missing
+        model_name = config_document.get("model_name") or "gpt-4o-mini"
         temperature = config_document.get("temperature")
+        if temperature is None:
+            temperature = 0.2
         llm = None
         
-        if model_name.startswith('gpt'):
-            llm = ChatOpenAI(model=model_name, temperature=temperature, api_key=current_app.config.get("OPENAI_API_KEY"))
-        elif model_name.startswith('qwen'):
+        if isinstance(model_name, str) and model_name.startswith('gpt'):
+            api_key = current_app.config.get("OPENAI_API_KEY")
+            if not api_key:
+                return jsonify({"message": "OPENAI_API_KEY is not configured."}), 500
+            llm = ChatOpenAI(model=model_name, temperature=temperature, api_key=api_key)
+        elif isinstance(model_name, str) and model_name.startswith('qwen'):
             llm = ChatTongyi(model=model_name, api_key=current_app.config.get("QWEN_API_KEY"))
-        elif model_name.startswith('deepseek'):
+        elif isinstance(model_name, str) and model_name.startswith('deepseek'):
             llm = ChatDeepSeek(model=model_name, temperature=temperature, api_key=current_app.config.get("DEEPSEEK_API_KEY"))
         
         if not llm:
-            return jsonify({"message": f"Unsupported model: {model_name}"}), 400
+            return jsonify({"message": f"Unsupported or missing model: {model_name}"}), 400
 
         # --- Survey Chat: AI Speaks First Logic ---
         config_type = config_document.get("config_type", "normal")
-        history = get_session_history(chat_id, user_id_for_history, config_id)
 
         if config_type == 'survey' and not history.messages:
             logger.info(f"🌱 New 'survey' chat detected (ID: {chat_id}). Fetching first question.")
@@ -274,7 +509,7 @@ def chat(config_id, chat_id):
                 first_question = initial_docs[0].page_content
                 history.add_message(AIMessage(content=first_question))
                 
-                logger.info(f"✅ Successfully sent first survey question: '{first_question[:80]}...'" )
+                logger.info(f"✅ Successfully sent first survey question: '{first_question[:80]}'" )
                 return jsonify({
                     "response": first_question,
                     "sources": [],

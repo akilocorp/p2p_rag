@@ -12,13 +12,9 @@ class User:
     @staticmethod
     def get_collection():
         """
-        A helper method to get the user collection object from the database.
-        It assumes you have a 'MONGO_CLIENT' in your app config.
+        Get the users collection using the existing app-level Mongo DB connection.
         """
-        mongo_client = pymongo.MongoClient(current_app.config["MONGO_URI"], serverSelectionTimeoutMS=5000)
-        # Get the database from the client
-        db = mongo_client[current_app.config["MONGO_DB_NAME"]]
-        # Get the collection using the name stored in the config
+        db = current_app.config['MONGO_DB']
         return db[current_app.config["USER"]]
 
     @staticmethod

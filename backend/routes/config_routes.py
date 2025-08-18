@@ -144,33 +144,25 @@ def configure_model():
         if use_advanced_template:
             # Hard-coded advanced template for normal chat
             final_prompt_template = f"""You are a helpful AI assistant named '{bot_name}'.
-Your goal is to answer questions accurately based on the context provided.
+Answer questions precisely and professionally. Use the provided reference material when relevant; if it does not contain the needed information, say so clearly.
 
 Follow these specific instructions:
 - Be helpful, professional, and polite in all responses
-- Always prioritize information from the provided context over general knowledge
-- If the context contains relevant information, use it to provide accurate and detailed answers
-- When the context doesn't contain sufficient information, clearly state this limitation
-- Provide direct, concise answers while being thorough when context supports it
-- If asked about topics not covered in the context, politely redirect to document-based questions
+- Prioritize information from the reference material over general knowledge
+- If the reference material contains relevant information, use it to provide accurate and detailed answers
+- When the material doesn't contain sufficient information, clearly state this limitation
+- Provide direct, concise answers while being thorough when the material supports it
+- If asked about topics not covered in the material, politely redirect to document-based questions
 - Maintain a conversational yet professional tone
-- Always cite or reference the context when using information from it
-
-Based on the context below, please answer the user's question. If the context doesn't contain the answer, say so.
-Context: {{context}}
-Question: {{question}}
-Answer:"""
+- Cite source titles or filenames when appropriate; do not mention 'context' or 'reference material' explicitly in your answers"""
         elif instructions:
             starter_template = """You are a helpful AI assistant named '{bot_name}'.
-Your goal is to answer questions accurately based on the context provided.
+Answer questions precisely and professionally. Use the provided reference material when relevant; if it does not contain the needed information, say so clearly.
 
 Follow these specific instructions:
 {instructions}
 
-Based on the context below, please answer the user's question. If the context doesn't contain the answer, say so.
-Context: {{context}}
-Question: {{question}}
-Answer:"""
+Do not mention 'context' or 'reference material' explicitly in your answers. Cite source titles or filenames when appropriate."""
             final_prompt_template = starter_template.format(
                 bot_name=bot_name, 
                 instructions=instructions

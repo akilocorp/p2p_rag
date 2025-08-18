@@ -18,4 +18,5 @@ dashscope
 docx2txt
 PyPDF2
 pypdf
+dnspython
 
